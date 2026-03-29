@@ -1,0 +1,49 @@
+{
+  "name": "@pagci/node",
+  "version": "0.1.0",
+  "description": "Official PAGCI Node.js SDK — PIX payments, withdrawals, refunds, and webhooks",
+  "license": "MIT",
+  "author": "PAGCI",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pagci/sdk-node"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "npm run build:esm && npm run build:cjs && npm run build:fixup",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:fixup": "echo {\"type\":\"module\"} > dist/esm/package.json && echo {\"type\":\"commonjs\"} > dist/cjs/package.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^22.0.0"
+  },
+  "dependencies": {}
+}
