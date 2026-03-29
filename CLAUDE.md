@@ -76,12 +76,48 @@ list(params?: ExampleListParams): Page<Example> {
 }
 ```
 
+## Webhook Listener (`src/listen.ts`)
+
+The `listen()` function provides local webhook testing with:
+- **Auto-detected tunnel** — tries localtunnel → cloudflared → ngrok (first available)
+- **Local HTTP server** — receives webhook POSTs, parses, logs
+- **`--verbose` mode** — shows full headers + pretty-printed JSON body
+- **`printQR()`** — renders PIX QR code in terminal (requires optional `qrcode-terminal`)
+
+### Architecture
+```
+listen() → startServer(port) → createTunnel(port)
+                 ↓                      ↓
+         local HTTP server      public URL (tunnel)
+                 ↓
+         onEvent callback + printEvent + printVerbose
+```
+
+### Rules for listen feature
+1. **Never add tunnel deps as runtime dependencies** — localtunnel, qrcode-terminal are optional peer deps
+2. **Tunnel providers auto-detect** — try in order, first available wins, clear error with install instructions if none found
+3. **Verbose output uses box-drawing characters** — `┌─ Headers`, `│`, `├─ Body`, `└──` for structured logs
+4. **Colors use raw ANSI codes** — zero deps, defined in `const c = { ... }` at top of file
+5. **All listen features must work without any optional deps** — core functionality (server + banner) always works, tunnel/QR degrade gracefully
+
+### Adding a new tunnel provider
+Add a `tryNewProvider(port)` function following the pattern of `tryLocaltunnel`/`tryCloudflared`/`tryNgrok`. Return `{ url, provider, close }` or `null`. Add to the `createTunnel` function in order of preference (easiest install first).
+
+### End-to-end test
+```bash
+PAGCI_API_KEY=your_key node test-tunnel.cjs
+```
+Creates a real payment, shows QR code, waits 3 min for webhook. Verbose mode shows full headers and body.
+
 ## Testing
 
 ```bash
 npm test          # vitest run (86 tests)
 npm run typecheck # tsc --noEmit
 npm run build     # dual CJS + ESM
+
+# End-to-end webhook tunnel test (requires API key + tunnel provider)
+PAGCI_API_KEY=key node test-tunnel.cjs
 ```
 
 HMAC test vectors MUST be validated against the Go implementation. If `SignWebhookPayload` changes in the backend, update `test/webhooks.test.ts` immediately.
@@ -92,3 +128,4 @@ HMAC test vectors MUST be validated against the Go implementation. If `SignWebho
 2. **Using `any` in public API** — Use `unknown` or specific types. `any` only in `_response.headers`.
 3. **Retry on POST without idem key** — `shouldRetry()` in `retry.ts` blocks this. Never bypass.
 4. **Forgetting to update ErrorCode enum** — Backend has 96+ codes. Run `/sync-sdk` to catch drift.
+5. **Adding runtime deps** — SDK has ZERO runtime deps. Tunnel/QR are optional peer deps. Never change this.

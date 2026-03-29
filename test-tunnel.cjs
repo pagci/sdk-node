@@ -1,6 +1,25 @@
+/**
+ * End-to-end webhook tunnel test.
+ *
+ * Usage:
+ *   PAGCI_API_KEY=your_key node test-tunnel.cjs
+ *   PAGCI_API_KEY=your_key node test-tunnel.cjs --port 3000
+ */
+
 const { Pagci, listen, printQR } = require('./dist/cjs/index.js');
 
-const API_KEY = process.env.PAGCI_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl9pZCI6InRva18wMWttdjdkeGJqZzJkcTJneXB5OXJ2djVqOSIsInR5cGUiOiJsb2dpbiIsInVzZXJfaWQiOiJ1c3JfMDFrbXF0ZWE5N2M0ZXJ6OGp6czZ4cWg1NnIiLCJhZG1pbiI6dHJ1ZSwibGFzdF91cGRhdGVkIjoiMjAyNi0wMy0yN1QxNDoxNjoxNy40NDdaIiwidG9rZW5fbGFzdF91cGRhdGVkIjoiMjAyNi0wMy0yOFQyMjowMDo1OC45OTRaIiwic2NvcGVzIjpbImFsbCJdLCJleHAiOjE4MDYyNzEyNTgsImlhdCI6MTc3NDczNTI1OH0.z_D7iiPV8tyI80kWgmULxUqDibziW5YrgGiYDSaS5Eg';
+const TIMEOUT_MS = 180_000; // 3 minutes
+
+const API_KEY = process.env.PAGCI_API_KEY;
+if (!API_KEY) {
+  console.error('  Set PAGCI_API_KEY environment variable.');
+  process.exit(1);
+}
+
+const port = (() => {
+  const idx = process.argv.indexOf('--port');
+  return idx !== -1 && process.argv[idx + 1] ? parseInt(process.argv[idx + 1], 10) : 4500;
+})();
 
 async function main() {
   const pagci = new Pagci(API_KEY);
@@ -8,14 +27,12 @@ async function main() {
   // 1. Start tunnel with verbose mode
   let webhookReceived = false;
   const session = await listen(API_KEY, {
-    port: 4500,
+    port,
     verbose: true,
-    onEvent: (event) => {
-      webhookReceived = true;
-    },
+    onEvent: () => { webhookReceived = true; },
   });
 
-  // 2. Create payment R$0.01
+  // 2. Create payment (minimum value)
   const payment = await pagci.payments.create({
     owner: { wallet_id: 'icaro' },
     customer: { id: 'pix_test', document: '12345678900' },
@@ -41,11 +58,11 @@ async function main() {
   }
 
   console.log('');
-  console.log('  Waiting 120s for webhook...');
+  console.log('  Waiting', TIMEOUT_MS / 1000, 's for webhook...');
 
   // 4. Wait
   const start = Date.now();
-  while (Date.now() - start < 120000) {
+  while (Date.now() - start < TIMEOUT_MS) {
     if (webhookReceived) {
       console.log('  Webhook arrived after', Math.round((Date.now() - start) / 1000), 's');
       break;
@@ -53,7 +70,7 @@ async function main() {
     await new Promise((r) => setTimeout(r, 2000));
   }
 
-  if (!webhookReceived) console.log('  No webhook in 120s');
+  if (!webhookReceived) console.log('  No webhook in', TIMEOUT_MS / 1000, 's');
 
   await session.close();
   process.exit(0);
