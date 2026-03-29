@@ -69,7 +69,8 @@ describe('Webhook signature verification', () => {
 
     const event = client.webhooks.constructEvent(rawBody, header, secret);
 
-    expect(event.payload).toEqual(JSON.parse(rawBody));
+    expect(event.type).toBe('payment.confirmed');
+    expect(event.data).toEqual({ id: 'pay_123' });
     expect(event.timestamp).toBe(String(nowSeconds));
     expect(event.signature).toBe(computeExpectedHex(rawBody, secret, nowSeconds));
   });
@@ -112,7 +113,8 @@ describe('Webhook signature verification', () => {
     const header = signLikeGo(rawBody, secret, recentTs);
 
     const event = client.webhooks.constructEvent(rawBody, header, secret);
-    expect(event.payload).toEqual(JSON.parse(rawBody));
+    expect(event.type).toBe('payment.confirmed');
+    expect(event.data).toEqual({ id: 'pay_123' });
   });
 
   // ── constructEvent: custom tolerance ────────────────────────────
@@ -128,7 +130,8 @@ describe('Webhook signature verification', () => {
 
     // With 20s tolerance, 10s old should succeed
     const event = client.webhooks.constructEvent(rawBody, header, secret, 20);
-    expect(event.payload).toEqual(JSON.parse(rawBody));
+    expect(event.type).toBe('payment.confirmed');
+    expect(event.data).toEqual({ id: 'pay_123' });
   });
 
   // ── constructEvent: malformed header ────────────────────────────

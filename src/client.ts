@@ -27,16 +27,66 @@ export interface PagciConfig {
   httpAgent?: unknown;
 }
 
-// ── Webhook helpers return type ──────────────────────────────────────
+// ── Webhook verified event (discriminated union by event type) ────────
 
-export interface WebhookEvent {
-  /** Verified, parsed webhook payload. */
-  payload: unknown;
-  /** Signature header value. */
+import type { Payment } from './types/payment.js';
+import type { Withdrawal } from './types/withdrawal.js';
+import type { Balance } from './types/balance.js';
+
+interface WebhookEventBase {
+  /** HMAC signature that was verified. */
   signature: string;
-  /** Timestamp from the webhook header. */
+  /** Unix timestamp from the webhook header. */
   timestamp: string;
+  /** Per-wallet balances at time of event. */
+  balances?: Record<string, Balance>;
+  /** Account-level total balance. */
+  account_balance?: Balance;
 }
+
+export interface PaymentConfirmedEvent extends WebhookEventBase {
+  type: 'payment.confirmed';
+  data: Payment;
+}
+export interface PaymentFailedEvent extends WebhookEventBase {
+  type: 'payment.failed';
+  data: Payment;
+}
+export interface PaymentCancelledEvent extends WebhookEventBase {
+  type: 'payment.cancelled';
+  data: Payment;
+}
+export interface PaymentExpiredEvent extends WebhookEventBase {
+  type: 'payment.expired';
+  data: Payment;
+}
+export interface PaymentDisputeEvent extends WebhookEventBase {
+  type: 'payment.dispute';
+  data: Payment;
+}
+export interface WithdrawalSettledEvent extends WebhookEventBase {
+  type: 'withdrawal.settled';
+  data: Withdrawal;
+}
+export interface WithdrawalFailedEvent extends WebhookEventBase {
+  type: 'withdrawal.failed';
+  data: Withdrawal;
+}
+export interface RefundCompletedEvent extends WebhookEventBase {
+  type: 'refund.completed';
+  data: unknown;
+}
+
+/** Discriminated union of all webhook events. Switch on `event.type` for type narrowing. */
+export type WebhookEvent =
+  | PaymentConfirmedEvent
+  | PaymentFailedEvent
+  | PaymentCancelledEvent
+  | PaymentExpiredEvent
+  | PaymentDisputeEvent
+  | WithdrawalSettledEvent
+  | WithdrawalFailedEvent
+  | RefundCompletedEvent;
 
 // ── Client ───────────────────────────────────────────────────────────
 
@@ -139,11 +189,21 @@ export class Pagci {
           );
         }
 
+        const envelope = JSON.parse(rawBody) as {
+          event: string;
+          data: unknown;
+          balances?: Record<string, Balance>;
+          account_balance?: Balance;
+        };
+
         return {
-          payload: JSON.parse(rawBody),
+          type: envelope.event,
+          data: envelope.data,
+          balances: envelope.balances,
+          account_balance: envelope.account_balance,
           signature: sig,
           timestamp,
-        };
+        } as WebhookEvent;
       },
     };
   }
@@ -246,9 +306,20 @@ function verifyAndParse(
     );
   }
 
+  const envelope = JSON.parse(rawBody) as {
+    event: string;
+    resource_type: string;
+    data: unknown;
+    balances?: Record<string, Balance>;
+    account_balance?: Balance;
+  };
+
   return {
-    payload: JSON.parse(rawBody),
+    type: envelope.event,
+    data: envelope.data,
+    balances: envelope.balances,
+    account_balance: envelope.account_balance,
     signature: sig,
     timestamp,
-  };
+  } as WebhookEvent;
 }

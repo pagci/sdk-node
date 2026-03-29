@@ -1,6 +1,17 @@
 // ── Main client ──────────────────────────────────────────────────────
 export { Pagci } from './client.js';
-export type { PagciConfig, WebhookEvent } from './client.js';
+export type {
+  PagciConfig,
+  WebhookEvent,
+  PaymentConfirmedEvent,
+  PaymentFailedEvent,
+  PaymentCancelledEvent,
+  PaymentExpiredEvent,
+  PaymentDisputeEvent,
+  WithdrawalSettledEvent,
+  WithdrawalFailedEvent,
+  RefundCompletedEvent,
+} from './client.js';
 
 // ── Errors ───────────────────────────────────────────────────────────
 export {
