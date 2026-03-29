@@ -128,6 +128,28 @@ const withdrawal = await pagci.withdrawals.create({
 
 <br/>
 
+## Testar webhooks localmente
+
+```bash
+npx @pagci/node listen --port 3000
+```
+
+```
+  ⚡ PAGCI  Webhook Listener
+  ────────────────────────────────────────────────────
+  Session   a1b2c3d4-e5f6-7890-abcd-ef1234567890
+  Forward   http://localhost:3000
+  Status    ● Ready
+  ────────────────────────────────────────────────────
+
+  14:32:01  →  payment.confirmed       pay_01jx...  ✓ 200  23ms
+  14:32:05  →  withdrawal.settled      wdrl_01jx... ✓ 200  12ms
+```
+
+Recebe eventos em tempo real e encaminha para seu servidor local. Logs com cores, status de cada delivery, e latência.
+
+<br/>
+
 ## Verificar webhooks
 
 ```typescript
