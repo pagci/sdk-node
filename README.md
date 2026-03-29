@@ -76,13 +76,68 @@ npx @pagci/node listen --port 3000
 ```
   ⚡ PAGCI  Webhook Listener
   ────────────────────────────────────────────────────
-  Session   a1b2c3d4-e5f6
+  Tunnel    https://xyz.trycloudflare.com
   Forward   http://localhost:3000
+  Provider  cloudflared
   Status    ● Ready
   ────────────────────────────────────────────────────
 
-  14:32:01  →  payment.confirmed       ✓ 200  23ms
-  14:32:05  →  withdrawal.settled      ✓ 200  12ms
+  14:32:01  →  payment.confirmed       pay_01jx...  200  23ms
+  14:32:05  →  withdrawal.settled      wdrl_01jx... 200  12ms
+```
+
+O SDK detecta automaticamente qual tunnel usar. Instale um:
+
+<details>
+<summary>Opções de tunnel (por ordem de facilidade)</summary>
+<br/>
+
+**1. localtunnel** — mais fácil, só npm
+
+```bash
+npm install localtunnel
+```
+
+**2. cloudflared** — mais estável, sem conta
+
+```bash
+# macOS
+brew install cloudflared
+
+# Windows
+choco install cloudflared
+
+# Linux (Debian/Ubuntu)
+sudo apt install cloudflared
+```
+
+**3. ngrok** — requer conta gratuita
+
+```bash
+# macOS
+brew install ngrok
+
+# Windows
+choco install ngrok
+
+# Linux
+snap install ngrok
+
+# Setup (uma vez)
+ngrok config add-authtoken <seu_token>  # pegar em dashboard.ngrok.com
+```
+
+</details>
+
+Use a URL do tunnel como `overwrite_webhook_url` ao criar pagamentos:
+
+```typescript
+const session = await listen('sua_api_key', { port: 3000 });
+
+await pagci.payments.create({
+  // ...
+  config: { overwrite_webhook_url: session.url },
+});
 ```
 
 ---

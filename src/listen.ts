@@ -66,13 +66,14 @@ export interface ListenSession {
 
 // ── Pretty Output ────────────────────────────────────────────────────
 
-function printBanner(url: string, port: number): void {
+function printBanner(url: string, port: number, provider: string): void {
   const line = '─'.repeat(56);
   console.log();
   console.log(`  ${c.cyan}${c.bold}⚡ PAGCI${c.reset}  ${c.dim}Webhook Listener${c.reset}`);
   console.log(`  ${c.gray}${line}${c.reset}`);
   console.log(`  ${c.gray}Tunnel${c.reset}    ${c.white}${url}${c.reset}`);
   console.log(`  ${c.gray}Forward${c.reset}   ${c.white}http://localhost:${port}${c.reset}`);
+  console.log(`  ${c.gray}Provider${c.reset}  ${c.white}${provider}${c.reset}`);
   console.log(`  ${c.gray}Status${c.reset}    ${c.green}● Ready${c.reset}`);
   console.log(`  ${c.gray}${line}${c.reset}`);
   console.log();
@@ -100,32 +101,164 @@ function printEvent(event: string, resourceId: string, status: number, ms: numbe
   console.log(`  ${c.gray}${time}${c.reset}  ${eventColor}→${c.reset}  ${c.bold}${eventPadded}${c.reset} ${id}  ${statusStr}  ${c.dim}${ms}ms${c.reset}`);
 }
 
-// ── Tunnel ────────────────────────────────────────────────────────────
+// ── Tunnel providers (tried in order of ease of install) ─────────────
 
-async function createTunnel(port: number): Promise<{ url: string; close: () => Promise<void> }> {
-  // localtunnel is an optional peer dependency — dynamic import to avoid bundling
-  let ltModule: { default?: (opts: { port: number }) => Promise<{ url: string; close: () => void }> };
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    ltModule = await import(/* webpackIgnore: true */ 'localtunnel' as string);
-  } catch {
-    throw new Error(
-      `localtunnel is required for pagci listen.\n\n` +
-      `Install it:\n` +
-      `  npm install localtunnel\n`,
-    );
+import { execSync, spawn, type ChildProcess } from 'node:child_process';
+
+interface Tunnel {
+  url: string;
+  provider: string;
+  close: () => Promise<void>;
+}
+
+/**
+ * Tries tunnel providers in order:
+ *  1. localtunnel — npm install localtunnel (easiest, no binary)
+ *  2. cloudflared — quick tunnel, no account needed (most reliable)
+ *  3. ngrok       — requires free account + authtoken
+ *
+ * Uses whichever is available first.
+ */
+async function createTunnel(port: number, silent: boolean): Promise<Tunnel> {
+  // 1. localtunnel (npm package — easiest to install)
+  const lt = await tryLocaltunnel(port);
+  if (lt) {
+    if (!silent) printProvider('localtunnel');
+    return lt;
   }
 
-  const lt = ltModule.default ?? (ltModule as unknown as (opts: { port: number }) => Promise<{ url: string; close: () => void }>);
-  const tunnel = await lt({ port });
+  // 2. cloudflared (binary — most reliable)
+  const cf = await tryCloudflared(port);
+  if (cf) {
+    if (!silent) printProvider('cloudflared');
+    return cf;
+  }
 
-  return {
-    url: tunnel.url,
-    close: () => new Promise<void>((resolve) => {
-      tunnel.close();
-      resolve();
-    }),
-  };
+  // 3. ngrok (binary — requires account)
+  const ng = await tryNgrok(port);
+  if (ng) {
+    if (!silent) printProvider('ngrok');
+    return ng;
+  }
+
+  throw new Error(
+    `No tunnel provider found. Install one:\n\n` +
+    `  ${c.bold}Option 1 — localtunnel${c.reset} ${c.dim}(easiest, no binary)${c.reset}\n` +
+    `    npm install localtunnel\n\n` +
+    `  ${c.bold}Option 2 — cloudflared${c.reset} ${c.dim}(most reliable, no account)${c.reset}\n` +
+    `    brew install cloudflared          ${c.dim}# macOS${c.reset}\n` +
+    `    choco install cloudflared         ${c.dim}# Windows${c.reset}\n` +
+    `    sudo apt install cloudflared      ${c.dim}# Debian/Ubuntu${c.reset}\n\n` +
+    `  ${c.bold}Option 3 — ngrok${c.reset} ${c.dim}(requires free account)${c.reset}\n` +
+    `    brew install ngrok                ${c.dim}# macOS${c.reset}\n` +
+    `    choco install ngrok               ${c.dim}# Windows${c.reset}\n` +
+    `    snap install ngrok                ${c.dim}# Linux${c.reset}\n` +
+    `    ngrok config add-authtoken <token>${c.dim}# one-time setup${c.reset}\n`,
+  );
+}
+
+function printProvider(name: string): void {
+  console.log(`  ${c.gray}Provider${c.reset}  ${c.white}${name}${c.reset}`);
+}
+
+// ── Provider: localtunnel ────────────────────────────────────────────
+
+async function tryLocaltunnel(port: number): Promise<Tunnel | null> {
+  try {
+    const ltModule = await import(/* webpackIgnore: true */ 'localtunnel' as string);
+    const lt = ltModule.default ?? ltModule;
+    const tunnel = await (lt as (opts: { port: number }) => Promise<{ url: string; close: () => void }>)({ port });
+    return {
+      url: tunnel.url,
+      provider: 'localtunnel',
+      close: () => new Promise<void>((r) => { tunnel.close(); r(); }),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── Provider: cloudflared ────────────────────────────────────────────
+
+async function tryCloudflared(port: number): Promise<Tunnel | null> {
+  // Check if cloudflared binary exists
+  try {
+    execSync('cloudflared --version', { stdio: 'ignore' });
+  } catch {
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    const proc: ChildProcess = spawn(
+      'cloudflared', ['tunnel', '--url', `http://localhost:${port}`, '--no-autoupdate'],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) { resolved = true; proc.kill(); resolve(null); }
+    }, 15_000);
+
+    const onData = (chunk: Buffer): void => {
+      const line = chunk.toString();
+      // cloudflared prints the URL to stderr like: "... https://xxx.trycloudflare.com ..."
+      const match = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i.exec(line);
+      if (match && !resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        resolve({
+          url: match[0],
+          provider: 'cloudflared',
+          close: () => new Promise<void>((r) => { proc.kill(); proc.on('close', () => r()); }),
+        });
+      }
+    };
+
+    proc.stdout?.on('data', onData);
+    proc.stderr?.on('data', onData);
+    proc.on('error', () => { if (!resolved) { resolved = true; clearTimeout(timeout); resolve(null); } });
+    proc.on('close', () => { if (!resolved) { resolved = true; clearTimeout(timeout); resolve(null); } });
+  });
+}
+
+// ── Provider: ngrok ──────────────────────────────────────────────────
+
+async function tryNgrok(port: number): Promise<Tunnel | null> {
+  try {
+    execSync('ngrok version', { stdio: 'ignore' });
+  } catch {
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    const proc: ChildProcess = spawn(
+      'ngrok', ['http', String(port), '--log', 'stdout', '--log-format', 'json'],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) { resolved = true; proc.kill(); resolve(null); }
+    }, 15_000);
+
+    proc.stdout?.on('data', (chunk: Buffer) => {
+      const line = chunk.toString();
+      // ngrok JSON logs contain "url":"https://xxx.ngrok-free.app"
+      const match = /"url":"(https:\/\/[^"]+)"/.exec(line);
+      if (match?.[1] && !resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        resolve({
+          url: match[1],
+          provider: 'ngrok',
+          close: () => new Promise<void>((r) => { proc.kill(); proc.on('close', () => r()); }),
+        });
+      }
+    });
+
+    proc.on('error', () => { if (!resolved) { resolved = true; clearTimeout(timeout); resolve(null); } });
+    proc.on('close', () => { if (!resolved) { resolved = true; clearTimeout(timeout); resolve(null); } });
+  });
 }
 
 // ── Local HTTP Server ────────────────────────────────────────────────
@@ -189,10 +322,10 @@ export async function listen(
   });
 
   // Create public tunnel
-  const tunnel = await createTunnel(port);
+  const tunnel = await createTunnel(port, silent);
 
   if (!silent) {
-    printBanner(tunnel.url, port);
+    printBanner(tunnel.url, port, tunnel.provider);
   }
 
   return {
