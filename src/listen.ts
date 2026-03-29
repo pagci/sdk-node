@@ -41,6 +41,8 @@ export interface ListenOptions {
   onEvent?: (event: IncomingWebhook) => void;
   /** Suppress log output. Default: false */
   silent?: boolean;
+  /** Show full headers and JSON body for each event. Default: false */
+  verbose?: boolean;
 }
 
 export interface IncomingWebhook {
@@ -99,6 +101,61 @@ function printEvent(event: string, resourceId: string, status: number, ms: numbe
   const id = resourceId ? `${c.dim}${resourceId.slice(0, 20)}${c.reset}` : '';
 
   console.log(`  ${c.gray}${time}${c.reset}  ${eventColor}→${c.reset}  ${c.bold}${eventPadded}${c.reset} ${id}  ${statusStr}  ${c.dim}${ms}ms${c.reset}`);
+}
+
+function printVerbose(raw: string, headers: Record<string, string | string[] | undefined>): void {
+  // Headers
+  const relevantHeaders = ['x-webhook-signature', 'x-webhook-timestamp', 'x-webhook-id', 'x-webhook-event', 'content-type'];
+  const headerEntries = Object.entries(headers)
+    .filter(([k]) => relevantHeaders.includes(k.toLowerCase()))
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  if (headerEntries.length > 0) {
+    console.log(`  ${c.gray}┌─ Headers${c.reset}`);
+    for (const [key, val] of headerEntries) {
+      const value = Array.isArray(val) ? val.join(', ') : val ?? '';
+      console.log(`  ${c.gray}│${c.reset}  ${c.cyan}${key}${c.reset}: ${c.dim}${value}${c.reset}`);
+    }
+    console.log(`  ${c.gray}│${c.reset}`);
+  }
+
+  // Body (pretty JSON, indented)
+  try {
+    const parsed = JSON.parse(raw);
+    const pretty = JSON.stringify(parsed, null, 2);
+    const lines = pretty.split('\n');
+    console.log(`  ${c.gray}├─ Body${c.reset}`);
+    for (const line of lines) {
+      console.log(`  ${c.gray}│${c.reset}  ${c.dim}${line}${c.reset}`);
+    }
+    console.log(`  ${c.gray}└──${c.reset}`);
+  } catch {
+    console.log(`  ${c.gray}├─ Body (raw)${c.reset}`);
+    console.log(`  ${c.gray}│${c.reset}  ${c.dim}${raw.slice(0, 500)}${c.reset}`);
+    console.log(`  ${c.gray}└──${c.reset}`);
+  }
+  console.log();
+}
+
+/**
+ * Print a QR code in the terminal (requires optional qrcode-terminal package).
+ * Falls back to a hint message if not installed.
+ */
+export async function printQR(text: string): Promise<void> {
+  try {
+    const qrt = await import(/* webpackIgnore: true */ 'qrcode-terminal' as string);
+    const generate = (qrt.default?.generate ?? qrt.generate) as
+      (text: string, opts: { small: boolean }, cb: (code: string) => void) => void;
+    await new Promise<void>((resolve) => {
+      generate(text, { small: true }, (code: string) => {
+        const indented = code.split('\n').map((l: string) => `  ${l}`).join('\n');
+        console.log(indented);
+        resolve();
+      });
+    });
+  } catch {
+    console.log(`  ${c.dim}(npm i qrcode-terminal para QR no terminal)${c.reset}`);
+  }
 }
 
 // ── Tunnel providers (tried in order of ease of install) ─────────────
@@ -294,7 +351,7 @@ export async function listen(
   options: ListenOptions = {},
 ): Promise<ListenSession> {
   const port = options.port ?? 4400;
-  const { onEvent, silent = false } = options;
+  const { onEvent, silent = false, verbose = false } = options;
 
   // Start local HTTP server to receive webhook POSTs
   const server = startServer(port, (body, headers) => {
@@ -311,6 +368,9 @@ export async function listen(
 
       if (!silent) {
         printEvent(payload.event, resourceId, 200, ms);
+        if (verbose) {
+          printVerbose(body, headers as Record<string, string | string[] | undefined>);
+        }
       }
       return 200;
     } catch {

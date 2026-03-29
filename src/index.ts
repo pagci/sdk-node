@@ -48,7 +48,7 @@ export { NodeHttpClient } from './net/NodeHttpClient.js';
 export { generateIdempotencyKey } from './idempotency.js';
 
 // ── Webhook Listener (dev tool) ─────────────────────────────────────
-export { listen } from './listen.js';
+export { listen, printQR } from './listen.js';
 export type { ListenOptions, ListenSession, IncomingWebhook } from './listen.js';
 
 // ── Pagination ──────────────────────────────────────────────────────

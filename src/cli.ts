@@ -30,16 +30,24 @@ function printHelp(): void {
   console.log(`  ${c.bold}Options${c.reset}`);
   console.log(`    --port <n>     Port to listen on (default: 4400)`);
   console.log(`    --key <key>    API key (or set PAGCI_API_KEY)`);
+  console.log(`    --verbose      Show full headers and JSON body`);
   console.log();
 }
+
+const FLAGS_WITHOUT_VALUE = new Set(['verbose']);
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
-    if (arg.startsWith('--') && i + 1 < args.length) {
-      result[arg.slice(2)] = args[++i]!;
-    } else if (!arg.startsWith('--')) {
+    if (arg.startsWith('--')) {
+      const key = arg.slice(2);
+      if (FLAGS_WITHOUT_VALUE.has(key)) {
+        result[key] = 'true';
+      } else if (i + 1 < args.length) {
+        result[key] = args[++i]!;
+      }
+    } else {
       result['_command'] = arg;
     }
   }
@@ -64,6 +72,7 @@ async function main(): Promise<void> {
 
   const session = await listen(apiKey, {
     port: args['port'] ? parseInt(args['port'], 10) : undefined,
+    verbose: 'verbose' in args,
   });
 
   const shutdown = async (): Promise<void> => {

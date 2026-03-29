@@ -44,16 +44,19 @@
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0",
-    "@types/node": "^22.0.0"
+    "vitest": "^3.0.0"
   },
-  "dependencies": {},
   "peerDependencies": {
-    "localtunnel": "^2.0.0"
+    "localtunnel": "^2.0.0",
+    "qrcode-terminal": "^0.12.0"
   },
   "peerDependenciesMeta": {
     "localtunnel": {
+      "optional": true
+    },
+    "qrcode-terminal": {
       "optional": true
     }
   }
