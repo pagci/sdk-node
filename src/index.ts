@@ -38,7 +38,7 @@ export { generateIdempotencyKey } from './idempotency.js';
 
 // ── Webhook Listener (dev tool) ─────────────────────────────────────
 export { listen } from './listen.js';
-export type { ListenOptions, ListenSession, WebhookPayload } from './listen.js';
+export type { ListenOptions, ListenSession, IncomingWebhook } from './listen.js';
 
 // ── Pagination ──────────────────────────────────────────────────────
 export { Page } from './pagination.js';

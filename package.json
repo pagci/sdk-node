@@ -48,5 +48,13 @@
     "vitest": "^3.0.0",
     "@types/node": "^22.0.0"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "peerDependencies": {
+    "localtunnel": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "localtunnel": {
+      "optional": true
+    }
+  }
 }
