@@ -3,6 +3,16 @@
 
 import type { Owner, CompactOwner, Customer, Item } from './common.js';
 
+// ── Status & value literal unions ───────────────────────────────────
+
+export type PaymentStatus = 'pending' | 'confirmed' | 'failed' | 'cancelled' | 'expired' | 'psp_failed';
+export type RecipientStatus = 'pending' | 'paid' | 'locked' | 'settling' | 'settled' | 'failed' | 'cancelled' | 'debt_pending' | 'debt_locked' | 'debt_paid';
+export type PaymentOrigin = '' | 'change' | 'debt' | 'transfer' | 'kyc';
+export type DocumentType = 'cpf' | 'cnpj';
+export type QRFormat = 'png' | 'svg';
+export type SortOrder = 'newest' | 'oldest' | 'amount' | 'status';
+export type RefundStatus = 'pending' | 'completed' | 'failed';
+
 // ── Nested types ────────────────────────────────────────────────────
 
 /** Payer information from the PSP (who actually paid the PIX). */
@@ -11,7 +21,7 @@ export interface Payer {
   /** Masked CPF/CNPJ. */
   document?: string;
   /** "cpf" or "cnpj". */
-  document_type?: string;
+  document_type?: DocumentType;
   bank?: Bank;
   matches_customer?: boolean;
 }
@@ -35,7 +45,7 @@ export interface RefundEntry {
 /** Deduction entry on a recipient. */
 export interface DeductionEntry {
   wallet_id: string;
-  origin: string;
+  origin: PaymentOrigin;
   /** Amount in centavos (integer). */
   amount: number;
 }
@@ -102,7 +112,7 @@ export interface QRBadgeConfig {
 export interface QRConfig {
   size?: number;
   /** "png" or "svg". */
-  format?: string;
+  format?: QRFormat;
   logo?: QRLogoConfig;
   foreground?: QRForegroundConfig;
   module?: QRModuleConfig;
@@ -121,8 +131,8 @@ export interface RecipientView {
   /** Original amount before deductions, in centavos (integer). */
   original_amount: number;
   /** Recipient status. */
-  status: string;
-  origin?: string;
+  status: RecipientStatus;
+  origin?: PaymentOrigin;
   participate_gateway_fees: boolean;
   /** ISO 8601 timestamp. */
   available_at: string;
@@ -159,8 +169,8 @@ export interface LiquidatorView {
 /** Full payment detail (GET /payments/:id response). */
 export interface Payment {
   id: string;
-  status: string;
-  origin?: string;
+  status: PaymentStatus;
+  origin?: PaymentOrigin;
   idempotency_key?: string;
   api_owner?: string;
   owner: Owner;
@@ -186,8 +196,8 @@ export interface Payment {
 /** Compact payment view used in list endpoints. */
 export interface PaymentCompact {
   id: string;
-  status: string;
-  origin?: string;
+  status: PaymentStatus;
+  origin?: PaymentOrigin;
   owner: CompactOwner;
   customer: Customer;
   /** Total PIX amount in centavos (integer). */
@@ -200,7 +210,7 @@ export interface PaymentCompact {
 
 /** Status count used in payment list response. */
 export interface StatusCount {
-  status: string;
+  status: PaymentStatus;
   count: number;
 }
 
@@ -212,7 +222,7 @@ export interface RecipientParams {
   wallet_id: string;
   /** Amount in centavos (integer). */
   amount: number;
-  origin?: string;
+  origin?: PaymentOrigin;
   participate_gateway_fees?: boolean;
   /** ISO 8601 when funds become available. */
   available_at?: string;
@@ -259,7 +269,7 @@ export interface RefundResponse {
   payment_id: string;
   /** Total refund amount in centavos (integer). */
   refund_total: number;
-  status: string;
+  status: RefundStatus;
   withdrawal_ids?: string[];
   distribution: RefundDistEntry[];
 }
@@ -276,9 +286,17 @@ export interface PaymentListParams {
   /** Smart search -- auto-detects payment ID, e2e ID, document, email, or payer name. */
   q?: string;
   owner_wallet?: string;
+  idempotency_key?: string;
+  customer_doc?: string;
+  /** Minimum amount in centavos (integer). */
+  amount_gte?: number;
+  /** Maximum amount in centavos (integer). */
+  amount_lte?: number;
+  /** Filter by wallet ID. */
+  wallet_id?: string;
   /** Start date (ISO 8601). */
-  from?: string;
+  created_gte?: string;
   /** End date (ISO 8601). */
-  to?: string;
+  created_lte?: string;
   origin?: string;
 }

@@ -1,6 +1,9 @@
 // ── Withdrawal types ────────────────────────────────────────────────
 // Source: cmd/specgen/types.go (WithdrawalView, Receiver, etc.)
 
+export type WithdrawalStatus = 'pending' | 'psp_calling' | 'settling' | 'settled' | 'failed' | 'frozen' | 'rejected' | 'reversed';
+export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'random' | 'wallet' | 'refund';
+
 /** Receiver bank information on a withdrawal. */
 export interface ReceiverBank {
   name?: string;
@@ -37,13 +40,13 @@ export interface Withdrawal {
   /** Final amount after fees in centavos (integer). */
   amount: number;
   pix_key: string;
-  pix_key_type: string;
+  pix_key_type: PixKeyType;
   origin?: string;
   /** Debt collected in this withdrawal, in centavos (integer). */
   debt_amount: number;
   /** Fee charged to user, in centavos (integer). */
   fee: number;
-  status: string;
+  status: WithdrawalStatus;
   psp_name?: string;
   liquidator?: WithdrawalLiquidator | null;
   receiver?: Receiver | null;
@@ -62,7 +65,7 @@ export interface Withdrawal {
 /** Response from creating a withdrawal. */
 export interface CreateWithdrawalResponse {
   id: string;
-  status: string;
+  status: WithdrawalStatus;
   /** Amount in centavos (integer). */
   amount: number;
 }
@@ -95,7 +98,7 @@ export interface WithdrawalListParams {
   idempotency_key?: string;
   q?: string;
   /** Start date (ISO 8601). */
-  from?: string;
+  created_gte?: string;
   /** End date (ISO 8601). */
-  to?: string;
+  created_lte?: string;
 }

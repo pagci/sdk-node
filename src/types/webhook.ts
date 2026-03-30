@@ -123,8 +123,8 @@ export interface WebhookDeliveryListParams {
   target_status?: string;
   event?: string;
   /** Start date (ISO 8601). */
-  from?: string;
+  created_gte?: string;
   /** End date (ISO 8601). */
-  to?: string;
+  created_lte?: string;
   wallet_id?: string;
 }

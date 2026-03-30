@@ -3,6 +3,8 @@
 
 import type { ListMeta } from './common.js';
 
+export type DebtStatus = 'debt_pending' | 'debt_locked' | 'debt_paid' | 'cancelled';
+
 /** Parameters for creating a debt. */
 export interface CreateDebtParams {
   wallet_id: string;
@@ -19,7 +21,7 @@ export interface CreateDebtResponse {
   /** Amount in centavos (integer). */
   amount: number;
   referer: string;
-  status: string;
+  status: DebtStatus;
 }
 
 /** Debt item in a list response (includes timestamps). */
@@ -28,7 +30,7 @@ export interface DebtListItem {
   wallet_id: string;
   /** Amount in centavos (integer). */
   amount: number;
-  status: string;
+  status: DebtStatus;
   referer: string;
   /** ISO 8601 timestamp. */
   created_at: string;
@@ -52,7 +54,7 @@ export interface DebtListParams {
   status?: string;
   wallet_id?: string;
   /** Start date (ISO 8601). */
-  from?: string;
+  created_gte?: string;
   /** End date (ISO 8601). */
-  to?: string;
+  created_lte?: string;
 }

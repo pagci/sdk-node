@@ -39,6 +39,8 @@ export type {
 } from './payment.js';
 
 export type {
+  WithdrawalStatus,
+  PixKeyType,
   ReceiverBank,
   Receiver,
   WithdrawalLiquidator,
@@ -71,6 +73,7 @@ export type {
 } from './webhook.js';
 
 export type {
+  DebtStatus,
   CreateDebtParams,
   CreateDebtResponse,
   DebtListItem,
