@@ -82,6 +82,18 @@ export type {
 } from './debt.js';
 
 export type {
+  GiftStatus,
+  GiftMethod,
+  GiftOrigin,
+  CreateGiftParams,
+  CreateGiftResponse,
+  GetGiftResponse,
+  RegenerateGiftParams,
+  RegenerateGiftResponse,
+  RevokeGiftResponse,
+} from './gift.js';
+
+export type {
   CreateAccessTokenParams,
   CreateAccessTokenResponse,
   CreateAPIKeyParams,

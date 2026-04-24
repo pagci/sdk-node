@@ -163,6 +163,21 @@ export enum ErrorCode {
   // Compensation path: open a debt on the receiver wallet.
   RefundNotSupportedForInternalCharge = 'refund_not_supported_for_internal_charge',
 
+  // ── Phase 94 — Gift PIX ───────────────────────────────────────
+  // Sources: internal/handler/helpers.go:351-376 errorMappings (Phases
+  // 90-93). Every code below is emitted by a POST /payments/gift,
+  // GET /gift, POST /payments/gift/:id/{regenerate-link,revoke}, or
+  // the middleware guarding gift tokens on `/withdrawals`.
+  GiftPixDisabled = 'gift_pix_disabled',                     // 404 — feature flag off / route hidden
+  GiftInvalidMethod = 'gift_invalid_method',                 // 400 — method ∉ {"pix","internal_charge"}
+  GiftInvalidExpiry = 'gift_invalid_expiry',                 // 400 — link_expires_in_seconds out of [60, 2592000]
+  GiftFundingWalletRequired = 'gift_funding_wallet_required',// 400 — method=internal_charge w/o funding_wallet_id
+  GiftMessageTooLong = 'gift_message_too_long',              // 400 — message > 140 chars
+  GiftAmountOutOfRange = 'gift_amount_out_of_range',         // 400 — amount ≤ 0 or over PIX ceiling
+  GiftAlreadyClaimed = 'gift_already_claimed',               // 403 — regenerate/revoke blocked in claimed/in-progress/under_review states
+  RouteNotAllowedForGiftToken = 'route_not_allowed_for_gift_token', // 403 — gift token hit a non-gift route
+  GiftTokenRateLimited = 'gift_token_rate_limited',          // 429 — per-token limit on POST /withdrawals
+
   // ── Handler-level codes (not in errorMappings) ────────────────
   InvalidRequestBody = 'invalid_request_body',
   InternalError = 'internal_error',
