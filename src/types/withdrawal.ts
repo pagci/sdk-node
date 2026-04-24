@@ -1,8 +1,25 @@
 // ── Withdrawal types ────────────────────────────────────────────────
 // Source: cmd/specgen/types.go (WithdrawalView, Receiver, etc.)
 
-export type WithdrawalStatus = 'pending' | 'psp_calling' | 'settling' | 'settled' | 'failed' | 'frozen' | 'rejected' | 'reversed';
-export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'random' | 'wallet' | 'refund';
+/**
+ * Withdrawal lifecycle status.
+ *
+ * Terminal failure-like states carry distinct money-flow semantics:
+ * - `failed`   — natural PSP failure (timeout, explicit rejection)
+ * - `reverted` — admin stopped a pre-payout withdrawal (frozen/rejected → reverted)
+ * - `reversed` — admin reversed a settled withdrawal (settled → reversed via CLI)
+ */
+export type WithdrawalStatus = 'pending' | 'psp_calling' | 'settling' | 'settled' | 'failed' | 'frozen' | 'rejected' | 'reversed' | 'reverted';
+/**
+ * PIX key type enum.
+ *
+ * Phase 87 — `internal_charge` is the type used to pay an internal charge.
+ * It requires the `pix_key` to be in the form `"charge:<paymentID>"`, where
+ * `<paymentID>` is the id of the receiver-side charge payment (returned as
+ * `payable_key` on the charge response). Any other `pix_key_type` combined
+ * with a `charge:` prefix is rejected with `ErrorCode.InvalidPixKeyType`.
+ */
+export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'random' | 'wallet' | 'refund' | 'internal_charge';
 
 /** Receiver bank information on a withdrawal. */
 export interface ReceiverBank {
