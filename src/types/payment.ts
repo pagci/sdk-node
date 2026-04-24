@@ -5,9 +5,49 @@ import type { Owner, CompactOwner, Customer, Item } from './common.js';
 
 // ── Status & value literal unions ───────────────────────────────────
 
-export type PaymentStatus = 'pending' | 'confirmed' | 'failed' | 'cancelled' | 'expired' | 'psp_failed';
+/**
+ * Payment status. Runtime canonical — responses always emit values from this
+ * union. 'expired' is distinct from 'cancelled' — QR-expired payments emit
+ * 'expired', user/system cancellations emit 'cancelled'. The full-detail
+ * view additionally returns 'refunded' when every owner recipient has been
+ * fully refunded; the list/compact view does not emit 'refunded' (see
+ * internal/paymentview/paymentview.go).
+ *
+ * For request filters the backend also accepts the legacy alias
+ * `confirmed` → `paid`; that is exposed separately via {@link PaymentStatusFilter}
+ * so this response-side union stays narrow.
+ */
+export type PaymentStatus =
+  | 'pending'
+  | 'paid'
+  | 'failed'
+  | 'cancelled'
+  | 'expired'
+  | 'psp_failed'
+  | 'debt_pending'
+  | 'debt_locked'
+  | 'debt_paid'
+  | 'refunded';
+
+/**
+ * Accepted values for the `status` query filter on list endpoints.
+ * Superset of {@link PaymentStatus} with the back-compat alias and the
+ * internal lifecycle states. Prefer canonical values in new code — the
+ * alias is kept for back-compat only and may be removed in a future major
+ * release.
+ */
+export type PaymentStatusFilter =
+  | PaymentStatus
+  /** @deprecated alias of `paid` — responses emit `paid`. */
+  | 'confirmed'
+  /** Internal lifecycle state; queryable by admins. Not emitted as document status. */
+  | 'locked'
+  /** Internal lifecycle state; queryable by admins. Not emitted as document status. */
+  | 'settling'
+  /** Internal lifecycle state; queryable by admins. Not emitted as document status. */
+  | 'settled';
 export type RecipientStatus = 'pending' | 'paid' | 'locked' | 'settling' | 'settled' | 'failed' | 'cancelled' | 'debt_pending' | 'debt_locked' | 'debt_paid';
-export type PaymentOrigin = '' | 'change' | 'debt' | 'transfer' | 'kyc';
+export type PaymentOrigin = '' | 'change' | 'debt' | 'transfer' | 'kyc' | 'internal_charge';
 export type DocumentType = 'cpf' | 'cnpj';
 export type QRFormat = 'png' | 'svg';
 export type SortOrder = 'newest' | 'oldest' | 'amount' | 'status';
@@ -122,6 +162,35 @@ export interface QRConfig {
   badge?: QRBadgeConfig;
 }
 
+// ── Internal charge (Phase 87) ──────────────────────────────────────
+
+/**
+ * InternalCharge subdoc present on payments created with `kind: "internal_charge"`.
+ * The charge is paid by another wallet of the same api_owner via
+ * `POST /withdrawals` with `pix_key: "charge:<paymentID>"`.
+ *
+ * State is enumerable by inspecting these fields:
+ *  - nil                                                 → not an internal charge
+ *  - reserved_by_withdrawal == "" && paid_by_withdrawal == ""  → awaiting payment
+ *  - reserved_by_withdrawal != "" && paid_by_withdrawal == ""  → reserved (claim in flight)
+ *  - paid_by_withdrawal != ""                            → paid
+ *  - confirmed_side_effects_at != null                   → paid + webhooks/analytics done
+ *
+ * Invariant: `paid_by_withdrawal != ""` implies `reserved_by_withdrawal == paid_by_withdrawal`.
+ */
+export interface InternalCharge {
+  /** Withdrawal ID that won the Pattern A CAS claim (empty until a withdrawal reserves it). */
+  reserved_by_withdrawal?: string;
+  /** Withdrawal ID that settled the charge (empty until settle worker confirms). */
+  paid_by_withdrawal?: string;
+  /** ISO 8601 timestamp — set atomically with paid_by_withdrawal by ConfirmInternalChargeAtomic. */
+  paid_at?: string;
+  /** ISO 8601 timestamp — cutoff after which the charge becomes unclaimable. */
+  expires_at: string;
+  /** ISO 8601 timestamp — idempotency marker set after HandleConfirmed pipeline completes. */
+  confirmed_side_effects_at?: string;
+}
+
 // ── Recipient view (response) ───────────────────────────────────────
 
 export interface RecipientView {
@@ -187,6 +256,17 @@ export interface Payment {
   config: PaymentConfig;
   history: HistoryEvent[];
   kyc_validation?: KYCValidation | null;
+  /**
+   * Phase 87 — present when `origin === 'internal_charge'`. Omitted for regular payments.
+   * See {@link InternalCharge} for field semantics and state enumeration.
+   */
+  internal_charge?: InternalCharge;
+  /**
+   * Phase 87 — present when `origin === 'internal_charge'`. Pass this string as
+   * `pix_key` on `POST /withdrawals` (from a wallet of the same api_owner) to
+   * pay the charge. Format: `charge:<paymentID>`.
+   */
+  payable_key?: string;
   /** ISO 8601 timestamp. */
   created_at: string;
   /** ISO 8601 timestamp. */
@@ -239,6 +319,19 @@ export interface CreatePaymentParams {
   config?: PaymentConfig;
   /** QR code customization. Pass object for custom config. */
   qr?: QRConfig;
+  /**
+   * Phase 87 — set to `"internal_charge"` to create an internal charge
+   * (no PSP call, no QR code). The returned payment carries `payable_key`
+   * which another wallet of the same api_owner can pass as `pix_key` on
+   * `POST /withdrawals` to pay the charge.
+   *
+   * When set: the server rejects 400 `liquidator_not_allowed_for_internal`
+   * if you also provide `liquidator` — the liquidator is forced to `internal`.
+   *
+   * Input-only: the field is NOT persisted; the durable discriminator is
+   * `payment.internal_charge != null` on the response.
+   */
+  kind?: 'internal_charge';
 }
 
 /** Per-recipient entry for a refund request. */
@@ -282,15 +375,17 @@ export interface PaymentListParams {
   page?: number;
   per_page?: number;
   sort?: string;
+  /** Payment status filter. Accepts CSV (e.g. "paid,pending"). */
   status?: string;
-  /** Smart search -- auto-detects payment ID, e2e ID, document, email, or payer name. */
+  /** Smart search — auto-detects payment ID, e2e ID, document, email, or payer name. Minimum 2 characters. */
   q?: string;
   owner_wallet?: string;
   idempotency_key?: string;
+  /** Exact match on customer CPF/CNPJ. Accepts formatted (123.456.789-00) or raw digits — punctuation is stripped server-side. */
   customer_doc?: string;
-  /** Minimum amount in centavos (integer). */
+  /** Minimum pix_total in centavos (integer only, e.g. 1050 = R$10,50). */
   amount_gte?: number;
-  /** Maximum amount in centavos (integer). */
+  /** Maximum pix_total in centavos (integer only, e.g. 10000 = R$100,00). */
   amount_lte?: number;
   /** Filter by wallet ID. */
   wallet_id?: string;

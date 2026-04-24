@@ -52,6 +52,8 @@ export enum ErrorCode {
   IPNotAllowed = 'ip_not_allowed',
 
   // ── 404 Not Found ─────────────────────────────────────────────
+  PreferencePlanNotFound = 'preference_plan_not_found',
+  LiquidatorNotFound = 'liquidator_not_found',
   PaymentNotFound = 'payment_not_found',
   WithdrawalNotFound = 'withdrawal_not_found',
   UserNotFound = 'user_not_found',
@@ -68,6 +70,8 @@ export enum ErrorCode {
   MagicTokenNotFound = 'magic_token_not_found',
 
   // ── 409 Conflict ──────────────────────────────────────────────
+  OptimisticLockConflict = 'optimistic_lock_conflict',
+  PreferencePlanInUse = 'preference_plan_in_use',
   DuplicateIdempotencyKey = 'duplicate_idempotency_key',
   ActiveWithdrawalExists = 'active_withdrawal_exists',
   DuplicateReferer = 'duplicate_referer',
@@ -92,6 +96,8 @@ export enum ErrorCode {
   InvalidFileType = 'invalid_file_type',
 
   // ── 422 Unprocessable Entity (business rules) ─────────────────
+  PreferencePlanInactive = 'preference_plan_inactive',
+  LiquidatorRefInvalid = 'liquidator_ref_invalid',
   InsufficientBalance = 'insufficient_balance',
   RefundExceedsBalance = 'refund_exceeds_balance',
   RecipientNotHeld = 'recipient_not_held',
@@ -119,6 +125,39 @@ export enum ErrorCode {
   // ── 503 Service Unavailable ───────────────────────────────────
   StorageUnavailable = 'storage_unavailable',
   ServiceNotConfigured = 'service_not_configured',
+  // Phase 89 — PSP routing failures surface here. PreferencePlanRefNotResolved
+  // = strict resolver refused because a non-empty ref pointed at a missing or
+  // inactive plan (misconfiguration, not infrastructure). NoEligiblePSP =
+  // selector evaluated every candidate and rejected all. PaymentAllPSPsFailed
+  // = every candidate was actually called and each one returned
+  // transient/hard-down (distinct from "no candidate was callable").
+  PreferencePlanRefNotResolved = 'preference_plan_ref_not_resolved',
+  NoEligiblePSP = 'no_eligible_psp',
+  PaymentAllPSPsFailed = 'payment_all_psps_failed',
+
+  // ── 504 Gateway Timeout ───────────────────────────────────────
+  // Phase 89 — request context deadline expired BETWEEN PSP fallback
+  // attempts (distinct from per-PSP timeout which is FailureTransient and
+  // continues the loop).
+  PaymentDeadlineExceeded = 'payment_deadline_exceeded',
+
+  // ── Phase 87 — Internal charge ────────────────────────────────
+  // Returned when `kind=internal_charge` is paired with a client-supplied
+  // `liquidator.name` — the liquidator is server-forced to `internal`.
+  LiquidatorNotAllowedForInternal = 'liquidator_not_allowed_for_internal',
+  // Internal charge resolution errors — `POST /withdrawals` with `pix_key="charge:..."`.
+  ChargeNotFound = 'charge_not_found',
+  NotInternalCharge = 'not_internal_charge',
+  ChargeExpired = 'charge_expired',
+  ChargeAlreadyReserved = 'charge_already_reserved',
+  ChargeAlreadyPaid = 'charge_already_paid',
+  SelfPayInternalCharge = 'self_pay_forbidden',
+  SplitSelfInternalCharge = 'split_self_forbidden',
+  AmountMismatchInternalCharge = 'amount_mismatch',
+  CrossOwnerNotSupported = 'cross_owner_not_supported',
+  // Returned when the caller tries to reverse a settled withdrawal that paid an internal charge.
+  // Compensation path: open a debt on the receiver wallet (admin-only).
+  ReverseForbiddenInternalCharge = 'reverse_forbidden_internal_charge',
 
   // ── Handler-level codes (not in errorMappings) ────────────────
   InvalidRequestBody = 'invalid_request_body',
@@ -129,6 +168,7 @@ export enum ErrorCode {
   LoginTokenRequired = 'login_token_required',
   AdminTargetForbidden = 'admin_target_forbidden',
   DefaultWhitelabelProtected = 'default_whitelabel_protected',
+  DefaultPreferencePlanProtected = 'default_preference_plan_protected',
   ScopeAllRequired = 'scope_all_required',
   ImpersonationBlocked = 'impersonation_blocked',
   TenantNotFound = 'tenant_not_found',
