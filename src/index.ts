@@ -61,6 +61,7 @@ export { DebtsResource } from './resources/debts.js';
 export { BalanceResource } from './resources/balance.js';
 export { WebhookEndpointsResource } from './resources/webhookEndpoints.js';
 export { TokensResource } from './resources/tokens.js';
+export { GiftsResource } from './resources/gifts.js';
 
 // ── Types ───────────────────────────────────────────────────────────
 export type {
@@ -96,6 +97,15 @@ export type {
   RefundDistEntry,
   RefundResponse,
   PaymentListParams,
+  GiftStatus,
+  GiftMethod,
+  GiftOrigin,
+  CreateGiftParams,
+  CreateGiftResponse,
+  GetGiftResponse,
+  RegenerateGiftParams,
+  RegenerateGiftResponse,
+  RevokeGiftResponse,
   ReceiverBank,
   Receiver,
   WithdrawalLiquidator,

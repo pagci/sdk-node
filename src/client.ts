@@ -11,6 +11,7 @@ import { PaymentsResource } from './resources/payments.js';
 import { WithdrawalsResource } from './resources/withdrawals.js';
 import { DebtsResource } from './resources/debts.js';
 import { BalanceResource } from './resources/balance.js';
+import { GiftsResource } from './resources/gifts.js';
 import { WebhookEndpointsResource } from './resources/webhookEndpoints.js';
 import { TokensResource } from './resources/tokens.js';
 
@@ -110,6 +111,11 @@ export class Pagci {
   private _payments?: PaymentsResource;
   get payments(): PaymentsResource {
     return (this._payments ??= new PaymentsResource(this._sender));
+  }
+
+  private _gifts?: GiftsResource;
+  get gifts(): GiftsResource {
+    return (this._gifts ??= new GiftsResource(this._sender));
   }
 
   private _withdrawals?: WithdrawalsResource;
