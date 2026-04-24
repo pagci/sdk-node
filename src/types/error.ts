@@ -158,6 +158,10 @@ export enum ErrorCode {
   // Returned when the caller tries to reverse a settled withdrawal that paid an internal charge.
   // Compensation path: open a debt on the receiver wallet (admin-only).
   ReverseForbiddenInternalCharge = 'reverse_forbidden_internal_charge',
+  // Returned when the caller tries to refund an internal_charge payment.
+  // Refund is blocked by construction (internal PSP has no refund capability).
+  // Compensation path: open a debt on the receiver wallet.
+  RefundNotSupportedForInternalCharge = 'refund_not_supported_for_internal_charge',
 
   // ── Handler-level codes (not in errorMappings) ────────────────
   InvalidRequestBody = 'invalid_request_body',
