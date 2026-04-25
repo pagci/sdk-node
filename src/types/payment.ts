@@ -227,8 +227,35 @@ export interface LiquidatorView {
   payer?: Payer | null;
   /** Time to create PIX charge (ms). */
   creation_ms?: number | null;
-  /** Time from creation to claim (ms). */
+  /**
+   * Time to claim from the QR pool, in ms.
+   * `0` means the QR did not come from the pool (PSP miss or internal charge).
+   *
+   * **Legacy field** — kept for backward compatibility. For the canonical
+   * critical-path latency on origin=pix payments (whether pool hit or PSP
+   * miss), prefer {@link total_qr_ms}. For the canonical pool-hit signal,
+   * prefer {@link pool_hit}.
+   */
   claim_ms: number;
+  /**
+   * Total critical-path time to obtain the QR, in ms.
+   *
+   * Populated on every payment with a real QR (origin=pix), regardless of
+   * whether the QR came from the pool or required a PSP call (including
+   * routing fallback). Absent (`undefined`) on internal charges, where no
+   * QR is produced — the backend emits `*int64` with `omitempty`, so the
+   * field is structurally dropped from the JSON response.
+   */
+  total_qr_ms?: number;
+  /**
+   * Canonical "QR came from the pool" signal.
+   *
+   * Always emitted (the backend Go field has no `omitempty`) — `false` is
+   * informative and distinguishes "QR came from the PSP, not the pool"
+   * from "no QR was produced" (internal charges, where `total_qr_ms` is
+   * also absent). Matches the always-emitted style of {@link claim_ms}.
+   */
+  pool_hit: boolean;
   /** Time from creation to payment (ms). */
   payment_ms?: number | null;
 }
