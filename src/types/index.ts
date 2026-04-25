@@ -53,6 +53,7 @@ export type {
 export type {
   Balance,
   TotalBalance,
+  BatchBalance,
   WalletListParams,
 } from './balance.js';
 
@@ -63,13 +64,24 @@ export type {
   WebhookEnvelope,
   WebhookEndpoint,
   WebhookEndpointsListResponse,
+  ReplaceWebhookEndpointsResponse,
+  ReplaceWebhookEndpointsParams,
+  AddWebhookEndpointParams,
+  AddWebhookEndpointResponse,
   WebhookEndpointInput,
+  // Deprecated aliases — kept one release for forward-compat. Prefer the
+  // ReplaceWebhookEndpoints* / AddWebhookEndpoint* names.
+  RegisterWebhooksResponse,
   RegisterWebhooksParams,
+  UpdateWebhookEndpointParams,
   WebhookDelivery,
   WebhookDeliveryListResponse,
   WebhookTestParams,
   WebhookTestResponse,
   WebhookDeliveryListParams,
+  WebhookEventInfo,
+  WebhookWildcardInfo,
+  WebhookEventsCatalogResponse,
 } from './webhook.js';
 
 export type {
@@ -100,5 +112,16 @@ export type {
   CreateAPIKeyResponse,
   UpdateTokenScopesParams,
 } from './token.js';
+
+export type {
+  FeeConfig,
+  Reserve,
+  TierBreakdown,
+  RecipientFormula,
+  FeeTier,
+  FeeResponse,
+  FeePreviewRecipient,
+  FeePreviewResponse,
+} from './fee.js';
 
 export { ErrorCode } from './error.js';

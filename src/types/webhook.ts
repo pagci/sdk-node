@@ -9,7 +9,11 @@ import type { ListMeta } from './common.js';
 // ── Webhook events ──────────────────────────────────────────────────
 
 export enum WebhookEventType {
-  PaymentConfirmed = 'payment.confirmed',
+  /**
+   * Emitted when a payment reaches the "paid" status.
+   * Follows the payment.{status} pattern aligned with response.status emission.
+   */
+  PaymentPaid = 'payment.paid',
   PaymentFailed = 'payment.failed',
   PaymentCancelled = 'payment.cancelled',
   PaymentExpired = 'payment.expired',
@@ -52,6 +56,8 @@ export interface WebhookEndpoint {
   events: string[];
   host: string;
   host_status: string;
+  /** Whether the endpoint is currently receiving webhook deliveries. Paused endpoints (active=false) are skipped at fanout time without being deleted. */
+  active: boolean;
 }
 
 export interface WebhookEndpointsListResponse {
@@ -59,13 +65,78 @@ export interface WebhookEndpointsListResponse {
   valid_events: string[];
 }
 
+/**
+ * Response shape of `PUT /hooks/endpoints` (replace-all). Does NOT include
+ * `valid_events` — use `listEvents()` for the catalog.
+ */
+export interface ReplaceWebhookEndpointsResponse {
+  endpoints: WebhookEndpoint[];
+}
+
+/**
+ * Single-endpoint shape used inside the replace-all `PUT /hooks/endpoints`
+ * request body. URL is verified via challenge-response before registration
+ * completes.
+ */
 export interface WebhookEndpointInput {
   url: string;
   events: string[];
 }
 
-export interface RegisterWebhooksParams {
+/** Payload for `PUT /hooks/endpoints` — replace the entire set. */
+export interface ReplaceWebhookEndpointsParams {
   endpoints: WebhookEndpointInput[];
+}
+
+/** Payload for `POST /hooks/endpoints` — append a single endpoint atomically. */
+export interface AddWebhookEndpointParams {
+  url: string;
+  events: string[];
+}
+
+/** Response of `POST /hooks/endpoints` — the single endpoint that was added. */
+export type AddWebhookEndpointResponse = WebhookEndpoint;
+
+/**
+ * Deprecated aliases retained for one release so existing imports keep
+ * compiling while consumers migrate to ReplaceWebhookEndpoints* names.
+ *
+ * @deprecated Use ReplaceWebhookEndpointsParams.
+ */
+export type RegisterWebhooksParams = ReplaceWebhookEndpointsParams;
+/** @deprecated Use ReplaceWebhookEndpointsResponse. */
+export type RegisterWebhooksResponse = ReplaceWebhookEndpointsResponse;
+
+/**
+ * Partial-update payload for `PUT /hooks/endpoints/{id}`. Send only the
+ * fields you want to change — omitted fields are preserved. At least one of
+ * `url`, `events`, or `active` must be provided.
+ */
+export interface UpdateWebhookEndpointParams {
+  /** New delivery URL. Triggers challenge-response verification when changed. */
+  url?: string;
+  /** Replacement event subscription list. */
+  events?: string[];
+  /** Pause (false) or resume (true) delivery without deleting the endpoint. */
+  active?: boolean;
+}
+
+// ── Webhook events catalog ──────────────────────────────────────────
+
+export interface WebhookEventInfo {
+  event: string;
+  description: string;
+  resource_type: string;
+}
+
+export interface WebhookWildcardInfo {
+  pattern: string;
+  description: string;
+}
+
+export interface WebhookEventsCatalogResponse {
+  events: WebhookEventInfo[];
+  wildcards: WebhookWildcardInfo[];
 }
 
 // ── Webhook delivery ────────────────────────────────────────────────
@@ -118,6 +189,7 @@ export interface WebhookDeliveryListParams {
   page?: number;
   per_page?: number;
   sort?: string;
+  /** Filter by delivery status. Comma-separated list. Values: pending, processing, delivered, failed, removed, skipped. Example: "failed,pending". */
   status?: string;
   resource_type?: string;
   target_status?: string;
