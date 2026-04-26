@@ -45,8 +45,8 @@ interface WebhookEventBase {
   account_balance?: Balance;
 }
 
-export interface PaymentConfirmedEvent extends WebhookEventBase {
-  type: 'payment.confirmed';
+export interface PaymentPaidEvent extends WebhookEventBase {
+  type: 'payment.paid';
   data: Payment;
 }
 export interface PaymentFailedEvent extends WebhookEventBase {
@@ -62,7 +62,7 @@ export interface PaymentExpiredEvent extends WebhookEventBase {
   data: Payment;
 }
 export interface PaymentDisputeEvent extends WebhookEventBase {
-  type: 'payment.dispute';
+  type: 'payment.dispute.opened';
   data: Payment;
 }
 export interface WithdrawalSettledEvent extends WebhookEventBase {
@@ -80,7 +80,7 @@ export interface RefundCompletedEvent extends WebhookEventBase {
 
 /** Discriminated union of all webhook events. Switch on `event.type` for type narrowing. */
 export type WebhookEvent =
-  | PaymentConfirmedEvent
+  | PaymentPaidEvent
   | PaymentFailedEvent
   | PaymentCancelledEvent
   | PaymentExpiredEvent

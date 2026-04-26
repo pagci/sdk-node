@@ -3,7 +3,7 @@ export { Pagci } from './client.js';
 export type {
   PagciConfig,
   WebhookEvent,
-  PaymentConfirmedEvent,
+  PaymentPaidEvent,
   PaymentFailedEvent,
   PaymentCancelledEvent,
   PaymentExpiredEvent,

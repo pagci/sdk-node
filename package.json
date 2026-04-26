@@ -1,6 +1,6 @@
 {
   "name": "@pagci/node",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Official PAGCI Node.js SDK — PIX payments, withdrawals, refunds, and webhooks",
   "license": "MIT",
   "author": "PAGCI",

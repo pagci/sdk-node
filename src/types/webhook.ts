@@ -17,7 +17,14 @@ export enum WebhookEventType {
   PaymentFailed = 'payment.failed',
   PaymentCancelled = 'payment.cancelled',
   PaymentExpired = 'payment.expired',
-  PaymentDispute = 'payment.dispute',
+  /**
+   * PIX dispute (MED) opened against a payment.
+   * Renamed from `'payment.dispute'` to `'payment.dispute.opened'` on 2026-04-25
+   * (quick-260425-rtv) to align with sibling `payment.dispute.accepted` /
+   * `payment.dispute.rejected` events; disputes have open/closed/resolved
+   * states and "opened" is semantically accurate. Lockstep with PAGGCI api.
+   */
+  PaymentDispute = 'payment.dispute.opened',
   WithdrawalSettled = 'withdrawal.settled',
   WithdrawalFailed = 'withdrawal.failed',
   RefundCompleted = 'refund.completed',
