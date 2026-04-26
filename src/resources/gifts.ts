@@ -9,6 +9,8 @@ import type {
   CreateGiftParams,
   CreateGiftResponse,
   GetGiftResponse,
+  GiftPreviewRequest,
+  GiftPreviewResponse,
   RegenerateGiftParams,
   RegenerateGiftResponse,
   RevokeGiftResponse,
@@ -73,6 +75,45 @@ export class GiftsResource {
         ...options,
         idempotencyKey: options?.idempotencyKey ?? generateIdempotencyKey(),
       },
+    );
+  }
+
+  /**
+   * Preview the fee breakdown that `POST /payments/gift` would produce
+   * for a given (amount, method, pass_fees_to_payer) tuple.
+   *
+   * Read-only by design — no DB write, no PSP call, no bearer token
+   * minted. Use it to populate UI fee disclaimers before committing the
+   * creator to issuing the gift.
+   *
+   * Unlike `create()`, this method does NOT auto-inject an idempotency
+   * key: preview is naturally idempotent (same inputs → same outputs
+   * deterministically) and caching responses on an Idempotency-Key would
+   * mask fee-plan mutations within the cache TTL window. Safe to retry
+   * without a key.
+   *
+   * Server contract:
+   *  - `pass_fees_to_payer` defaults `true` server-side when omitted; the
+   *    resolved value is echoed back on `response.input.pass_fees_to_payer`.
+   *  - `method=internal_charge` silently forces `pass_fees_to_payer=false`
+   *    and emits both fee fields as `0` (internal charges + internal
+   *    withdrawals are exempt from fees by design).
+   *  - Response is structurally NO-LEAK (D-94-13): no `wallet_id`,
+   *    `origin`, `recipients[]`, `whitelabel_*`, or `affiliate_*` keys.
+   *
+   * Returns `404 gift_pix_disabled` when `GIFT_PIX_ENABLED` is off
+   * server-side (parity with the rest of the gift surface).
+   */
+  async preview(
+    params: GiftPreviewRequest,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<GiftPreviewResponse>> {
+    // Read-only — no idempotency key auto-injection (unlike create).
+    return this.sender.request<GiftPreviewResponse>(
+      'POST',
+      '/gift/preview',
+      params,
+      options,
     );
   }
 

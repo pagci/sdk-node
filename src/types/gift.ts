@@ -69,6 +69,21 @@ export interface CreateGiftParams {
   message?: string;
   /** Validity window of the bearer access token, in seconds. Range [60, 2592000]. Defaults to 604800 (7 days). */
   link_expires_in_seconds?: number;
+  /**
+   * When true (default), the QR payer covers payment + withdrawal fees and
+   * the bearer receives `amount_cents` net at claim time. When false, the
+   * recipient absorbs the payment fee (legacy pre-Phase-98 behavior).
+   *
+   * Server forces `false` for `method: 'internal_charge'` (silent
+   * normalisation — internal charges and internal withdrawals are exempt
+   * from fees by design).
+   *
+   * Omit the field to inherit the server default (`true`). Send explicit
+   * `false` to opt out of fee pass-through. The server-side `*bool`
+   * pointer distinguishes "omitted" from "explicit false" — sending
+   * `false` is NOT the same as omitting.
+   */
+  pass_fees_to_payer?: boolean;
 }
 
 /**
@@ -166,4 +181,130 @@ export interface RevokeGiftResponse {
   revoked_at: string;
   /** Number of active tokens revoked in this call. 0 means no active tokens existed (idempotent replay). */
   revoked_count: number;
+}
+
+// ── Preview ─────────────────────────────────────────────────────────
+
+/**
+ * Parameters for `POST /gift/preview`.
+ *
+ * Read-only fee-breakdown calculator that mirrors what `POST /payments/gift`
+ * would compute, WITHOUT persisting state, calling the PSP, or minting a
+ * bearer access token. Use it to populate UI fee disclaimers before the
+ * creator commits to issuing the gift.
+ *
+ * Response shape is structurally NO-LEAK by design (D-94-13): the response
+ * type carries no `wallet_id`, `origin`, `recipients[]`, `whitelabel_*`, or
+ * `affiliate_*` field — only the aggregated fee + total breakdown.
+ *
+ * Validation (server-side, surfaces as 400):
+ *  - `amount_cents` > 0 and within the standard PIX limits.
+ *  - `method` ∈ {"pix", "internal_charge"}.
+ */
+export interface GiftPreviewRequest {
+  /** Gift amount in centavos (int64 > 0). Same range as POST /payments/gift. */
+  amount_cents: number;
+  /** Funding method. `'pix'` applies fees; `'internal_charge'` silently forces `pass_fees_to_payer=false` (both fees zero by design). */
+  method: GiftMethod;
+  /**
+   * Optional wallet that scopes the fee resolution. Overridden by the
+   * access-token-bound wallet when present (same forcing pattern as
+   * elsewhere in the API).
+   */
+  wallet_id?: string;
+  /**
+   * Whether the QR payer (not the creator) bears the payment + withdrawal
+   * fees.
+   *
+   * Omitted → server default `true`. Explicit `false` → legacy opt-out.
+   * Forced to `false` when `method: 'internal_charge'` — the resolved
+   * value is echoed back on `response.input.pass_fees_to_payer`.
+   */
+  pass_fees_to_payer?: boolean;
+}
+
+/**
+ * Echo of the resolved caller intent inside `GiftPreviewResponse.input`.
+ *
+ * The server resolves the effective `pass_fees_to_payer` (default-true on
+ * omit; force-false on `internal_charge`) and echoes the EXACT bool the
+ * fee math was computed against. Surfacing the resolved value lets
+ * integrators detect the silent force-false on internal charges without
+ * having to replicate the resolution logic client-side.
+ */
+export interface GiftPreviewInput {
+  /** Echo of the requested amount in centavos. */
+  amount_cents: number;
+  /** Echo of the requested funding method. */
+  method: GiftMethod;
+  /**
+   * Resolved value of `pass_fees_to_payer` used in the math (NOT the bool
+   * the client sent). May differ from the request: omitted → `true`;
+   * `method=internal_charge` → `false`.
+   */
+  pass_fees_to_payer: boolean;
+}
+
+/**
+ * Aggregated fee breakdown.
+ *
+ * Both fields are ALWAYS emitted — even as `0`/`0` for `internal_charge`
+ * gifts — so an explicit zero communicates "exempt by design" rather than
+ * "missing because the field was elided".
+ */
+export interface GiftPreviewFees {
+  /**
+   * Aggregated payment-side fee in centavos (sum of system + whitelabel +
+   * affiliate fee recipients on the gift payment). Zero for
+   * `method=internal_charge` by design.
+   */
+  payment_cents: number;
+  /**
+   * Frozen withdrawal-side fee in centavos that the bearer will pay at
+   * claim time. Zero when `pass_fees_to_payer=false` (legacy gift carve-out
+   * preserved) or `method=internal_charge`.
+   */
+  withdrawal_cents: number;
+}
+
+/**
+ * QR-payer total + bearer-net pair the integrator surfaces in the gift
+ * creation UI.
+ *
+ * Conservation invariant: `bearer_receives_cents + fees.payment_cents +
+ * fees.withdrawal_cents === pix_total_cents` for `method=pix +
+ * pass_fees_to_payer=true`.
+ */
+export interface GiftPreviewTotals {
+  /**
+   * Total PIX amount the QR payer scans and transfers, in centavos.
+   * Equals `amount + payment_fee + withdrawal_fee` when
+   * `pass_fees_to_payer=true`; equals `amount` when `method=internal_charge`.
+   */
+  pix_total_cents: number;
+  /**
+   * Net amount the gift bearer ends up with after claim, in centavos.
+   * Bearer-net is fixed by construction when `pass_fees_to_payer=true`
+   * (the whole point of fee pass-through).
+   */
+  bearer_receives_cents: number;
+}
+
+/**
+ * Response from `POST /gift/preview`.
+ *
+ * The response type structurally cannot leak granular fee allocations,
+ * recipient breakdowns, wallet identifiers, or origin discriminators —
+ * only the aggregated breakdown intended for end-user UI surfaces (D-94-13).
+ *
+ * `input` echoes the resolved caller intent (post default + force-false)
+ * so integrators can detect the silent normalisation on internal charges.
+ */
+export interface GiftPreviewResponse {
+  /** Echo of the resolved caller intent. */
+  input: GiftPreviewInput;
+  /** Aggregated payment-side + withdrawal-side fee breakdown. */
+  fees: GiftPreviewFees;
+  /** QR payer total + bearer-net pair. */
+  totals: GiftPreviewTotals;
 }

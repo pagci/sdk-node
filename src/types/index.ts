@@ -103,6 +103,11 @@ export type {
   RegenerateGiftParams,
   RegenerateGiftResponse,
   RevokeGiftResponse,
+  GiftPreviewRequest,
+  GiftPreviewInput,
+  GiftPreviewFees,
+  GiftPreviewTotals,
+  GiftPreviewResponse,
 } from './gift.js';
 
 export type {
