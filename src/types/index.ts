@@ -48,6 +48,7 @@ export type {
   CreateWithdrawalResponse,
   CreateWithdrawalParams,
   WithdrawalListParams,
+  WithdrawalSummary,
 } from './withdrawal.js';
 
 export type {

@@ -6,6 +6,7 @@ import type {
   CreateWithdrawalParams,
   CreateWithdrawalResponse,
   WithdrawalListParams,
+  WithdrawalSummary,
 } from '../types/index.js';
 import type { ListResponse } from '../types/common.js';
 import { Page } from '../pagination.js';
@@ -69,6 +70,30 @@ export class WithdrawalsResource {
     return this.sender.request<Record<string, unknown>>(
       'GET',
       `/withdrawals/${id}/receipt`,
+      undefined,
+      options,
+    );
+  }
+
+  /**
+   * Get the 4-card lifetime summary for the authenticated owner.
+   *
+   * Returns four int64 cents totals plus an optional last_updated_at
+   * RFC3339 timestamp. See `WithdrawalSummary` for field semantics.
+   *
+   * Failure semantics:
+   * - 503 `clickhouse_unavailable` — analytics infra down; retry with backoff.
+   * - 500 `internal_error` — MongoDB error; retry with backoff.
+   * - 401 `unauthorized` — token missing or invalid.
+   *
+   * Source: GET /withdrawals/summary (Phase 104).
+   */
+  async summary(
+    options?: RequestOptions,
+  ): Promise<ApiResponse<WithdrawalSummary>> {
+    return this.sender.request<WithdrawalSummary>(
+      'GET',
+      '/withdrawals/summary',
       undefined,
       options,
     );

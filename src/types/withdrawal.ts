@@ -119,3 +119,36 @@ export interface WithdrawalListParams {
   /** End date (ISO 8601). */
   created_lte?: string;
 }
+
+// ── Lifetime summary (Phase 104) ────────────────────────────────────
+
+/**
+ * Lifetime summary of withdrawals for the authenticated owner — 4 cards.
+ *
+ * All money fields are int64 centavos. JavaScript's Number type can safely
+ * represent integers up to 2^53 - 1 (Number.MAX_SAFE_INTEGER, ~9 quadrillion
+ * cents = ~9 × 10^13 reais), which is far above any realistic withdrawal
+ * volume. Callers needing > 2^53 cents must use BigInt.
+ *
+ * Source: GET /withdrawals/summary (Phase 104).
+ *
+ * Failure semantics:
+ * - 503 `clickhouse_unavailable` — analytics infra down; retry with backoff.
+ * - 500 `internal_error` — MongoDB error; retry with backoff.
+ * - 401 `unauthorized` — token missing or invalid.
+ */
+export interface WithdrawalSummary {
+  /** Saldo disponível para saque, em centavos. */
+  disponivel_centavos: number;
+  /** Saques em pending/psp_calling/settling, net (inflow - outflow), em centavos. */
+  em_processamento_centavos: number;
+  /** Total lifetime de saques settled, em centavos. */
+  total_sacado_centavos: number;
+  /** Total lifetime de saques failed/rejected/reverted/reversed, em centavos. */
+  rejeitados_centavos: number;
+  /**
+   * Timestamp RFC3339 UTC do evento mais recente visível na MV.
+   * Vazio (campo ausente) se a MV não tiver dados ainda — granularidade Date (dia).
+   */
+  last_updated_at?: string;
+}
