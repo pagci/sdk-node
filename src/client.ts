@@ -15,6 +15,7 @@ import { GiftsResource } from './resources/gifts.js';
 import { WebhookEndpointsResource } from './resources/webhookEndpoints.js';
 import { TokensResource } from './resources/tokens.js';
 import { SplitGrantsResource } from './resources/splitGrants.js';
+import { ExternalCreditsResource } from './resources/externalCredits.js';
 
 // ── Configuration ────────────────────────────────────────────────────
 
@@ -155,6 +156,22 @@ export class Pagci {
    */
   get splitGrants(): SplitGrantsResource {
     return (this._splitGrants ??= new SplitGrantsResource(this._sender));
+  }
+
+  private _externalCredits?: ExternalCreditsResource;
+  /**
+   * Cross-owner credits received via SplitGrant — historical
+   * reconciliation surface complementing the real-time
+   * `payment.paid` webhook (Phase 105 closure / D-20b).
+   *
+   * See {@link ExternalCreditsResource} for the privacy contract
+   * (D-19): the payer's real api_owner is NEVER returned, each row
+   * carries an opaque deterministic `payer_owner_masked` token.
+   */
+  get externalCredits(): ExternalCreditsResource {
+    return (this._externalCredits ??= new ExternalCreditsResource(
+      this._sender,
+    ));
   }
 
   // ── Webhook verification (utility, not a REST resource) ──────────

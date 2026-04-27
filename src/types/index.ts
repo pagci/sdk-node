@@ -127,6 +127,12 @@ export type {
 } from './splitGrant.js';
 
 export type {
+  ExternalCredit,
+  ExternalCreditListParams,
+  ExternalCreditListResponse,
+} from './externalCredit.js';
+
+export type {
   FeeConfig,
   Reserve,
   TierBreakdown,
