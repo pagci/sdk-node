@@ -62,6 +62,7 @@ export { BalanceResource } from './resources/balance.js';
 export { WebhookEndpointsResource } from './resources/webhookEndpoints.js';
 export { TokensResource } from './resources/tokens.js';
 export { GiftsResource } from './resources/gifts.js';
+export { SplitGrantsResource } from './resources/splitGrants.js';
 
 // ── Types ───────────────────────────────────────────────────────────
 export type {
@@ -141,5 +142,9 @@ export type {
   CreateAPIKeyParams,
   CreateAPIKeyResponse,
   UpdateTokenScopesParams,
+  SplitGrant,
+  CreateSplitGrantParams,
+  SplitGrantListParams,
+  SplitGrantListResponse,
 } from './types/index.js';
 export { ErrorCode, WebhookEventType } from './types/index.js';

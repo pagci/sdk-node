@@ -120,6 +120,13 @@ export type {
 } from './token.js';
 
 export type {
+  SplitGrant,
+  CreateSplitGrantParams,
+  SplitGrantListParams,
+  SplitGrantListResponse,
+} from './splitGrant.js';
+
+export type {
   FeeConfig,
   Reserve,
   TierBreakdown,

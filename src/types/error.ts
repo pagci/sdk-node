@@ -187,6 +187,23 @@ export enum ErrorCode {
   ReverseForbiddenGift = 'reverse_forbidden_gift',              // 403 — refund blocked for gift origins; compensate via finops.CreateDebt
   InternalChargeStructuralFee = 'internal_charge_structural_fee', // 500 — defensive: injectFees structural lock breach for internal charge origins
 
+  // ── Phase 105 — Cross-owner SplitGrant ────────────────────────
+  // Source: internal/handler/helpers.go errorMappings (D-16 + D-23 + D-24 +
+  // payment-level guard). The grant resource itself only emits NotFound +
+  // Revoked + Expired + WalletConflict on management endpoints; the rest
+  // are emitted at use time during POST /payments when the payer (A)
+  // references an `external_grant_id` in `recipients[i]`.
+  SplitGrantNotFound = 'split_grant_not_found',                       // 404 — grant_id does not exist OR belongs to another tenant (opaque)
+  SplitGrantRevoked = 'split_grant_revoked',                          // 422 — grant.revoked_at != null
+  SplitGrantExpired = 'split_grant_expired',                          // 422 — grant.expires_at <= now
+  SplitGrantPayerNotAllowed = 'split_grant_payer_not_allowed',        // 403 — payment.api_owner != grant.allowed_payer_owner_id
+  SplitGrantWalletRequired = 'split_grant_wallet_required',           // 400 — open grant + payload missing wallet_id
+  SplitGrantWalletConflict = 'split_grant_wallet_conflict',           // 400 — closed grant + payload wallet_id divergent (D-17)
+  SplitGrantSelfReferential = 'split_grant_self_referential',         // 403 — grant.issuer_owner_id == payment.api_owner (D-24)
+  SplitGrantOriginNotAllowed = 'split_grant_origin_not_allowed',      // 400 — origin not in {pix} (D-23 — opt-in restrictive)
+  SplitGrantCapExceeded = 'split_grant_cap_exceeded',                 // 422 — sum(external) > rank_limit × EXTERNAL_SPLIT_MAX_PCT_BPS / 10000 (D-02b)
+  SplitGrantNotMinority = 'split_grant_not_minority',                 // 422 — sum(external) >= sum(internal) (D-02c)
+
   // ── Handler-level codes (not in errorMappings) ────────────────
   InvalidRequestBody = 'invalid_request_body',
   InternalError = 'internal_error',

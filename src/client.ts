@@ -14,6 +14,7 @@ import { BalanceResource } from './resources/balance.js';
 import { GiftsResource } from './resources/gifts.js';
 import { WebhookEndpointsResource } from './resources/webhookEndpoints.js';
 import { TokensResource } from './resources/tokens.js';
+import { SplitGrantsResource } from './resources/splitGrants.js';
 
 // ── Configuration ────────────────────────────────────────────────────
 
@@ -143,6 +144,17 @@ export class Pagci {
   private _tokens?: TokensResource;
   get tokens(): TokensResource {
     return (this._tokens ??= new TokensResource(this._sender));
+  }
+
+  private _splitGrants?: SplitGrantsResource;
+  /**
+   * Cross-owner split authorisation (Phase 105).
+   *
+   * Issue grants that authorise other platforms to credit your wallets
+   * during their payment creation. See {@link SplitGrantsResource}.
+   */
+  get splitGrants(): SplitGrantsResource {
+    return (this._splitGrants ??= new SplitGrantsResource(this._sender));
   }
 
   // ── Webhook verification (utility, not a REST resource) ──────────
