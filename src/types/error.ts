@@ -178,6 +178,15 @@ export enum ErrorCode {
   RouteNotAllowedForGiftToken = 'route_not_allowed_for_gift_token', // 403 — gift token hit a non-gift route
   GiftTokenRateLimited = 'gift_token_rate_limited',          // 429 — per-token limit on POST /withdrawals
 
+  // ── Phase 102 — Gift Fee Architecture v2 ──────────────────────
+  // Source: internal/handler/helpers.go errorMappings (D-26 Round 2 revised
+  // — 3 sentinels, not 4). ErrGiftFeeMixedRole was REMOVED (D-12 cancelled
+  // — aggregation in ComputeFeeBreakdown per D-33 replaces mixed-role
+  // detection at the boundary).
+  GiftAmountTooSmallForFees = 'gift_amount_too_small_for_fees', // 400 — pass=false amount below sum(payment_fee + withdrawal_fee_prepay)
+  ReverseForbiddenGift = 'reverse_forbidden_gift',              // 403 — refund blocked for gift origins; compensate via finops.CreateDebt
+  InternalChargeStructuralFee = 'internal_charge_structural_fee', // 500 — defensive: injectFees structural lock breach for internal charge origins
+
   // ── Handler-level codes (not in errorMappings) ────────────────
   InvalidRequestBody = 'invalid_request_body',
   InternalError = 'internal_error',
