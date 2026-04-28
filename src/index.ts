@@ -64,6 +64,7 @@ export { TokensResource } from './resources/tokens.js';
 export { GiftsResource } from './resources/gifts.js';
 export { SplitGrantsResource } from './resources/splitGrants.js';
 export { ExternalCreditsResource } from './resources/externalCredits.js';
+export { PixKeysResource } from './resources/pixKeys.js';
 
 // ── Types ───────────────────────────────────────────────────────────
 export type {
@@ -150,5 +151,8 @@ export type {
   ExternalCredit,
   ExternalCreditListParams,
   ExternalCreditListResponse,
+  LookupPixKeyType,
+  LookupPixKeyParams,
+  LookupPixKeyResponse,
 } from './types/index.js';
 export { ErrorCode, WebhookEventType } from './types/index.js';

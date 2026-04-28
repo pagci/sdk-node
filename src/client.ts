@@ -16,6 +16,7 @@ import { WebhookEndpointsResource } from './resources/webhookEndpoints.js';
 import { TokensResource } from './resources/tokens.js';
 import { SplitGrantsResource } from './resources/splitGrants.js';
 import { ExternalCreditsResource } from './resources/externalCredits.js';
+import { PixKeysResource } from './resources/pixKeys.js';
 
 // ── Configuration ────────────────────────────────────────────────────
 
@@ -156,6 +157,16 @@ export class Pagci {
    */
   get splitGrants(): SplitGrantsResource {
     return (this._splitGrants ??= new SplitGrantsResource(this._sender));
+  }
+
+  private _pixKeys?: PixKeysResource;
+  /**
+   * DICT lookup (BACEN registry consultation). Resolves a PIX key to
+   * the registered receiver (name, masked document, bank). Read-only;
+   * scope `pix_keys:lookup`. quick-260428-o4g.
+   */
+  get pixKeys(): PixKeysResource {
+    return (this._pixKeys ??= new PixKeysResource(this._sender));
   }
 
   private _externalCredits?: ExternalCreditsResource;

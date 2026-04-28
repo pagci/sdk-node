@@ -146,4 +146,10 @@ export type {
   FeePreviewResponse,
 } from './fee.js';
 
+export type {
+  LookupPixKeyType,
+  LookupPixKeyParams,
+  LookupPixKeyResponse,
+} from './pixKey.js';
+
 export { ErrorCode } from './error.js';

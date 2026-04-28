@@ -134,6 +134,11 @@ export enum ErrorCode {
   PreferencePlanRefNotResolved = 'preference_plan_ref_not_resolved',
   NoEligiblePSP = 'no_eligible_psp',
   PaymentAllPSPsFailed = 'payment_all_psps_failed',
+  // quick-260428-o4g — POST /pix-keys/lookup. Both 503; distinct codes so
+  // SDK consumers can branch on "fail-over exhausted" vs "no provider
+  // configured at all". Mapped 1:1 from domain.ErrPixLookup* sentinels.
+  PixLookupAllPSPsFailed = 'pix_lookup_all_psps_failed',
+  PixLookupNoProvider = 'pix_lookup_no_provider',
 
   // ── 504 Gateway Timeout ───────────────────────────────────────
   // Phase 89 — request context deadline expired BETWEEN PSP fallback
