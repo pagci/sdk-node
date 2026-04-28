@@ -16,6 +16,11 @@ export enum ErrorCode {
   CannotCoverFee = 'cannot_cover_fee',
   InvalidPixKeyType = 'invalid_pix_key_type',
   InvalidPixKey = 'invalid_pix_key',
+  // quick-260428-q99 — emitted by POST /withdrawals when the pre-claim
+  // DICT pre-validation gate receives an authoritative NXKEY (Valid==false)
+  // from PixLookupService. Distinct from InvalidPixKey (format error):
+  // a key can be perfectly well-formed AND not exist in DICT.
+  InvalidPixKeyDICT = 'invalid_pix_key_dict',
   InvalidField = 'invalid_field',
   SelfTransfer = 'self_transfer',
   InvalidCPF = 'invalid_cpf',

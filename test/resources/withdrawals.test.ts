@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { WithdrawalsResource } from '../../src/resources/withdrawals.js';
 import type { RequestSender } from '../../src/requestSender.js';
+import { ErrorCode } from '../../src/types/index.js';
+import { ApiError } from '../../src/errors.js';
 
 // ── Mock RequestSender ────────────────────────────────────────────────
 //
@@ -16,9 +18,13 @@ interface CapturedCall {
 class MockRequestSender {
   calls: CapturedCall[] = [];
   fixtures: unknown[] = [];
+  errors: unknown[] = [];
 
   async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     this.calls.push({ method, path, body });
+    if (this.errors.length > 0) {
+      throw this.errors.shift();
+    }
     const next = this.fixtures.shift();
     return (next ?? {}) as T;
   }
@@ -88,5 +94,43 @@ describe('WithdrawalsResource.summary', () => {
     expect(summary.last_updated_at).toBeUndefined();
     expect(summary.disponivel_centavos).toBe(0);
     expect(summary.total_sacado_centavos).toBe(0);
+  });
+});
+
+// ── withdrawals.create() — quick-260428-q99 pre-claim DICT gate ──────
+//
+// Locks the SDK contract for the new 400 invalid_pix_key_dict error code
+// emitted by POST /withdrawals when the pre-claim DICT pre-validation gate
+// receives an authoritative NXKEY answer. Distinct from invalid_pix_key
+// (format error) — the SDK enum carries both and consumers branch on the
+// exact code.
+
+describe('WithdrawalsResource.create — DICT pre-validation gate', () => {
+  let mock: MockRequestSender;
+
+  beforeEach(() => {
+    mock = new MockRequestSender();
+  });
+
+  it('throws ApiError with code invalid_pix_key_dict on DICT NXKEY', async () => {
+    const w = resource(mock);
+    mock.errors.push(
+      new ApiError({
+        message: 'pix key not registered in DICT',
+        type: 'https://docs.pagci.com/errors/invalid_pix_key_dict',
+        title: 'Invalid Pix Key Dict',
+        status: 400,
+        code: ErrorCode.InvalidPixKeyDICT,
+      }),
+    );
+
+    await expect(
+      w.create({
+        wallet_id: 'wallet_main',
+        amount: 5000,
+        pix_key: 'naoexiste@example.com',
+        pix_key_type: 'email',
+      }),
+    ).rejects.toMatchObject({ status: 400, code: ErrorCode.InvalidPixKeyDICT });
   });
 });
