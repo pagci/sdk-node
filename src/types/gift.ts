@@ -91,9 +91,16 @@ export interface CreateGiftParams {
    * quick-260428-1pv). Two valid shapes:
    *
    *  - `true`            — render with branded defaults (256px SVG, badge,
-   *                        whitelabel logo if configured).
+   *                        whitelabel logo if configured). Universal
+   *                        access — every caller can opt in.
    *  - {@link QRConfig}  — full custom config (size, format, logo,
    *                        foreground, module, background, badge).
+   *                        Admin-only (quick-260428-gy0): direct admin
+   *                        context required (impersonation rejected).
+   *                        Non-admins sending the object form receive
+   *                        403 `qr_config_requires_admin`. Use `true`
+   *                        for the universally-available default-branding
+   *                        path.
    *
    * Anything else (`false`, `null`, number, string, array) is rejected by
    * the backend with `400 invalid_request_body`. Omit the field to keep

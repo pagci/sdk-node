@@ -367,8 +367,18 @@ export interface CreatePaymentParams {
   items: Item[];
   recipients: RecipientParams[];
   config?: PaymentConfig;
-  /** QR code customization. Pass object for custom config. */
-  qr?: QRConfig;
+  /**
+   * QR rendering directive.
+   *
+   * - `true` — default branding (universal access; every caller).
+   * - `QRConfig` object — custom config (admin-only; direct admin context
+   *   required, impersonation rejected). Non-admins sending the object
+   *   form receive 403 `qr_config_requires_admin`.
+   *
+   * Omit the field entirely to keep the legacy `qr_code` string response
+   * shape (Liquidator.PixQR copy-paste).
+   */
+  qr?: true | QRConfig;
   /**
    * Phase 87 — set to `"internal_charge"` to create an internal charge
    * (no PSP call, no QR code). The returned payment carries `payable_key`
