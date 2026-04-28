@@ -103,6 +103,8 @@ export type {
   GetGiftResponse,
   RegenerateGiftParams,
   RegenerateGiftResponse,
+  ResolveGiftParams,
+  ResolveGiftResponse,
   RevokeGiftResponse,
   GiftPreviewRequest,
   GiftPreviewInput,

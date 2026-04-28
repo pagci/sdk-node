@@ -7,8 +7,10 @@ import type {
   GetGiftResponse,
   GiftPreviewResponse,
   RegenerateGiftResponse,
+  ResolveGiftResponse,
   RevokeGiftResponse,
 } from '../../src/types/index.js';
+import { ErrorCode } from '../../src/types/error.js';
 
 // ── Mock RequestSender ────────────────────────────────────────────────
 
@@ -55,10 +57,9 @@ describe('GiftsResource.create', () => {
       status: 'pending',
       amount_cents: 10000,
       origin: 'gift_pix',
-      access_token: 'tok_01jx',
+      gift_path: '/gift/aB3cD9eF2gH4iJ7k',
       expires_at: '2026-05-01T00:00:00.000Z',
       qr_code: '00020126...',
-      qr_code_image_url: 'https://qr.example/01jx.png',
     };
     mock.fixtures.push(fixture);
 
@@ -83,6 +84,30 @@ describe('GiftsResource.create', () => {
     expect(resp.payment_id).toBe('pay_01jx');
     expect(resp.origin).toBe('gift_pix');
     expect(resp.qr_code).toBe('00020126...');
+    // Phase 106 BREAKING — gift_path is the new shareable artifact.
+    expect(resp.gift_path).toBe('/gift/aB3cD9eF2gH4iJ7k');
+  });
+
+  // ── Phase 106 BREAKING shape lock ─────────────────────────────────────
+  it('Phase 106 — create() returns gift_path; access_token is absent', async () => {
+    const gifts = resource(mock);
+    const fixture: CreateGiftResponse = {
+      payment_id: 'pay_01jz',
+      status: 'pending',
+      amount_cents: 25000,
+      origin: 'gift_pix',
+      gift_path: '/gift/zZ9yX8wV7uT6sR5q',
+      expires_at: '2026-05-04T12:00:00.000Z',
+      qr_code: '00020126...',
+    };
+    mock.fixtures.push(fixture);
+
+    const resp = await gifts.create({ amount_cents: 25000, method: 'pix' });
+
+    // Lock the new shape: gift_path present, access_token absent.
+    expect(resp.gift_path).toBe('/gift/zZ9yX8wV7uT6sR5q');
+    expect((resp as Record<string, unknown>).access_token).toBeUndefined();
+    expect((resp as Record<string, unknown>).qr_code_image_url).toBeUndefined();
   });
 
   it('respects caller-provided idempotency key', async () => {
@@ -105,7 +130,7 @@ describe('GiftsResource.create', () => {
       status: 'pending',
       amount_cents: 2000,
       origin: 'gift_internal_charge',
-      access_token: 'tok_01jy',
+      gift_path: '/gift/iC9hF8eG7dH6jI5k',
       expires_at: '2026-05-01T00:00:00.000Z',
     };
     mock.fixtures.push(fixture);
@@ -123,7 +148,8 @@ describe('GiftsResource.create', () => {
     });
     expect(resp.origin).toBe('gift_internal_charge');
     expect(resp.qr_code).toBeUndefined();
-    expect(resp.qr_code_image_url).toBeUndefined();
+    // Phase 106 — gift_path emitted for both origins.
+    expect(resp.gift_path).toBe('/gift/iC9hF8eG7dH6jI5k');
   });
 });
 
@@ -141,9 +167,11 @@ describe('GiftsResource.get', () => {
     const fixture: GetGiftResponse = {
       id: 'pay_01jx',
       amount_cents: 10000,
+      withdrawable_amount_cents: 9550,
       status: 'claimable',
       message: 'Parabéns!',
       claimed_at: null,
+      scheduled_at: null,
       expires_at: '2026-05-01T00:00:00.000Z',
     };
     mock.fixtures.push(fixture);
@@ -154,9 +182,13 @@ describe('GiftsResource.get', () => {
     expect(mock.calls[0].method).toBe('GET');
     expect(mock.calls[0].path).toBe('/gift');
     expect(mock.calls[0].body).toBeUndefined();
-    // `claimed_at: null` round-trips intact.
+    // `claimed_at: null` and `scheduled_at: null` round-trip intact.
     expect(resp.claimed_at).toBeNull();
+    expect(resp.scheduled_at).toBeNull();
     expect(resp.status).toBe('claimable');
+    // Phase 106 — withdrawable is the post-fee net (gross minus platform fee).
+    expect(resp.withdrawable_amount_cents).toBe(9550);
+    expect(resp.amount_cents).toBe(10000);
   });
 
   it('handles claimed_at set when the gift has been redeemed', async () => {
@@ -164,9 +196,11 @@ describe('GiftsResource.get', () => {
     const fixture: GetGiftResponse = {
       id: 'pay_01jx',
       amount_cents: 10000,
+      withdrawable_amount_cents: 9550,
       status: 'claimed',
       message: '',
       claimed_at: '2026-04-24T18:00:00.000Z',
+      scheduled_at: null,
       expires_at: '2026-05-01T00:00:00.000Z',
     };
     mock.fixtures.push(fixture);
@@ -190,7 +224,7 @@ describe('GiftsResource.regenerateLink', () => {
   it('POSTs /payments/gift/:id/regenerate-link with link_expires_in_seconds body', async () => {
     const gifts = resource(mock);
     const fixture: RegenerateGiftResponse = {
-      access_token: 'tok_new',
+      gift_path: '/gift/xY9wV2qZ8mN3oP1l',
       expires_at: '2026-05-01T00:00:00.000Z',
       regenerated_at: '2026-04-24T18:00:00.000Z',
     };
@@ -204,8 +238,25 @@ describe('GiftsResource.regenerateLink', () => {
     expect(mock.calls[0].method).toBe('POST');
     expect(mock.calls[0].path).toBe('/payments/gift/pay_01jx/regenerate-link');
     expect(mock.calls[0].body).toEqual({ link_expires_in_seconds: 3600 });
-    expect(resp.access_token).toBe('tok_new');
+    expect(resp.gift_path).toBe('/gift/xY9wV2qZ8mN3oP1l');
     expect(resp.regenerated_at).toBe('2026-04-24T18:00:00.000Z');
+  });
+
+  // ── Phase 106 BREAKING shape lock ─────────────────────────────────────
+  it('Phase 106 — regenerateLink() returns gift_path; access_token is absent', async () => {
+    const gifts = resource(mock);
+    const fixture: RegenerateGiftResponse = {
+      gift_path: '/gift/qR8sT9uV0wX1yZ2a',
+      expires_at: '2026-05-08T00:00:00.000Z',
+      regenerated_at: '2026-04-27T18:00:00.000Z',
+    };
+    mock.fixtures.push(fixture);
+
+    const resp = await gifts.regenerateLink('pay_01jx');
+
+    expect(resp.gift_path).toBe('/gift/qR8sT9uV0wX1yZ2a');
+    // Lock the new shape — access_token is structurally gone.
+    expect((resp as Record<string, unknown>).access_token).toBeUndefined();
   });
 
   it('sends empty-object body when no params are provided (server default-path)', async () => {
@@ -432,5 +483,112 @@ describe('GiftsResource.preview', () => {
     // not flag them as unused.
     expect(explicitTrue.pass_fees_to_payer).toBe(true);
     expect(omitted.pass_fees_to_payer).toBeUndefined();
+  });
+});
+
+// ── gifts.resolve() — Phase 106 ───────────────────────────────────────
+
+describe('GiftsResource.resolve', () => {
+  let mock: MockRequestSender;
+
+  beforeEach(() => {
+    mock = new MockRequestSender();
+  });
+
+  it('POSTs /gift/resolve with code body and returns the JWT', async () => {
+    const gifts = resource(mock);
+    const fixture: ResolveGiftResponse = {
+      access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig',
+      expires_at: '2026-04-27T18:30:00.000Z',
+    };
+    mock.fixtures.push(fixture);
+
+    const resp = await gifts.resolve({ code: 'aB3cD9eF2gH4iJ7k' });
+
+    expect(mock.calls).toHaveLength(1);
+    expect(mock.calls[0].method).toBe('POST');
+    expect(mock.calls[0].path).toBe('/gift/resolve');
+    // Body is `{code}` — code must be in the BODY, never the URL/path/query.
+    expect(mock.calls[0].body).toEqual({ code: 'aB3cD9eF2gH4iJ7k' });
+    expect(resp.access_token).toBe(
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig',
+    );
+    expect(resp.expires_at).toBe('2026-04-27T18:30:00.000Z');
+  });
+
+  it('does NOT auto-inject an idempotency key (unlike create)', async () => {
+    const gifts = resource(mock);
+    mock.fixtures.push({
+      access_token: 'jwt.x',
+      expires_at: '2026-04-27T18:30:00.000Z',
+    });
+
+    await gifts.resolve({ code: '0123456789abcdef' });
+
+    // No options → no auto-injection. Resolve mints fresh credentials by
+    // design; an Idempotency-Key would mask the intent.
+    const opts = mock.calls[0].options as
+      | { idempotencyKey?: string }
+      | undefined;
+    expect(opts?.idempotencyKey).toBeUndefined();
+  });
+
+  it('does not place the code in the URL path or query string', async () => {
+    const gifts = resource(mock);
+    mock.fixtures.push({
+      access_token: 'jwt.x',
+      expires_at: '2026-04-27T18:30:00.000Z',
+    });
+
+    await gifts.resolve({ code: 'SECRET_CODE_HERE' });
+
+    // Anti-leak: the path is fixed; the code only travels in the body.
+    expect(mock.calls[0].path).toBe('/gift/resolve');
+    expect(mock.calls[0].path).not.toContain('SECRET_CODE_HERE');
+  });
+
+  it('surfaces the 404 anti-enumeration error code through the SDK', async () => {
+    // The SDK's RequestSender translates non-2xx responses into thrown
+    // PagciError instances populated with the server's error code. Here
+    // we simulate that path: when the mock sender throws a structured
+    // error, the resolve() promise rejects with the same payload, and
+    // the consuming code can inspect `err.code === ErrorCode.GiftCodeNotFound`.
+    class ThrowingSender extends MockRequestSender {
+      async request<T>(
+        method: string,
+        path: string,
+        body?: unknown,
+        options?: unknown,
+      ): Promise<T> {
+        this.calls.push({ method, path, body, options });
+        // Mimic the runtime: an Error subclass with a .code property
+        // matching the server's anti-enum sentinel.
+        const err = Object.assign(
+          new Error('Code not found or expired'),
+          { code: ErrorCode.GiftCodeNotFound, status: 404 },
+        );
+        throw err;
+      }
+    }
+    const sender = new ThrowingSender();
+    const gifts = new GiftsResource(sender as unknown as RequestSender);
+
+    await expect(
+      gifts.resolve({ code: 'expired_or_unknown' }),
+    ).rejects.toMatchObject({
+      code: ErrorCode.GiftCodeNotFound,
+      status: 404,
+    });
+
+    // The request was issued exactly once before the rejection — no
+    // implicit retry on 404.
+    expect(sender.calls).toHaveLength(1);
+  });
+
+  it('ErrorCode.GiftCodeNotFound has the expected wire value', () => {
+    // Lock the wire value of the new enum entry so a downstream
+    // `if (err.code === 'gift_code_not_found')` keeps working across
+    // versions of the SDK.
+    expect(ErrorCode.GiftCodeNotFound).toBe('gift_code_not_found');
   });
 });

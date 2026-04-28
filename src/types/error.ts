@@ -178,6 +178,13 @@ export enum ErrorCode {
   RouteNotAllowedForGiftToken = 'route_not_allowed_for_gift_token', // 403 — gift token hit a non-gift route
   GiftTokenRateLimited = 'gift_token_rate_limited',          // 429 — per-token limit on POST /withdrawals
 
+  // ── Phase 106 — Gift PIX short-link resolver ──────────────────
+  // Anti-enumeration sentinel: every failure path of POST /gift/resolve
+  // (missing/expired/malformed/unknown code, malformed JSON, empty body,
+  // wrong-type fields) collapses to this single 404 code so attackers
+  // cannot distinguish failure modes by status, body, or headers.
+  GiftCodeNotFound = 'gift_code_not_found',                  // 404 — POST /gift/resolve catch-all anti-enum response
+
   // ── Phase 102 — Gift Fee Architecture v2 ──────────────────────
   // Source: internal/handler/helpers.go errorMappings (D-26 Round 2 revised
   // — 3 sentinels, not 4). ErrGiftFeeMixedRole was REMOVED (D-12 cancelled

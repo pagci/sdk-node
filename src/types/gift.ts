@@ -89,16 +89,28 @@ export interface CreateGiftParams {
 /**
  * Response from `POST /payments/gift`.
  *
- * The SDK returns the raw `access_token` + `expires_at`; the caller's
- * frontend constructs the magic link. Recommended format (D-90-13):
+ * **BREAKING (Phase 106 — SDK v2.0.0)**: the response shape changed.
+ * Pre-v2 returned `access_token` (bearer JWT) + `expires_at` (of bearer);
+ * v2 returns `gift_path` (relative `/gift/<code>`) + `expires_at` (of
+ * link). The bearer JWT is now minted on demand by `gifts.resolve()`.
+ *
+ * The merchant's frontend constructs the full URL as `<own-origin> +
+ * gift_path` — for example `"https://app.example.com" +
+ * "/gift/aB3cD9eF2gH4iJ7k"`. The backend never knows the merchant's
+ * domain (preserves GIFT-SEC-01).
+ *
+ * Recipients open the link, the page extracts the trailing 16-char code,
+ * and POSTs it to `/gift/resolve` (via `gifts.resolve()`) to mint the
+ * 30-minute bearer JWT. Recommended fragment format for the magic link
+ * (so the code is never sent to merchant analytics):
  *
  * ```
- * https://<app>/gift#token=<access_token>
+ * https://<app>/gift#code=<code>
  * ```
  *
- * Use the URL fragment (`#token=`) rather than a query string so the
- * token is not forwarded via the `Referer` header to third-party scripts
- * on the claim page (GIFT-SEC-01).
+ * `expires_at` semantics changed: now exposes the LINK lifetime
+ * (potentially days/weeks via `link_expires_in_seconds`) rather than the
+ * pre-v2 bearer JWT's 30-minute window.
  */
 export interface CreateGiftResponse {
   payment_id: string;
@@ -107,14 +119,21 @@ export interface CreateGiftResponse {
   amount_cents: number;
   /** `"gift_pix"` for PSP-backed gifts; `"gift_internal_charge"` for two-step internal-charge gifts. */
   origin: GiftOrigin;
-  /** JWT bearer token with scopes `[withdrawals:write, gifts:read]`. */
-  access_token: string;
-  /** RFC3339 UTC timestamp when the access token expires. */
+  /**
+   * Phase 106 — relative path component of the gift magic link
+   * (e.g. `/gift/aB3cD9eF2gH4iJ7k`). Frontend prefixes its own origin
+   * to construct the full URL. Backend never knows the merchant's
+   * domain (preserves GIFT-SEC-01).
+   */
+  gift_path: string;
+  /**
+   * RFC3339.ms UTC. LINK expiration timestamp (Phase 106) — when the code
+   * stops resolving via `gifts.resolve()`. NOT the bearer JWT expiry
+   * (which is 30 minutes after each resolve call).
+   */
   expires_at: string;
-  /** PIX identifier (copy-paste string). Present only when `origin === "gift_pix"`. */
+  /** PIX BR Code copy-paste string. Present only when `origin === "gift_pix"`. */
   qr_code?: string;
-  /** PSP-returned QR image URL (or base64 depending on PSP). Present only when `origin === "gift_pix"`. */
-  qr_code_image_url?: string;
 }
 
 // ── Get ─────────────────────────────────────────────────────────────
@@ -125,18 +144,42 @@ export interface CreateGiftResponse {
  * No path parameter — the gift is derived from the bearer's access token
  * on the server side (GIFT-MGMT-01 / D-92-06 — prevents gift enumeration).
  *
+ * **BREAKING (Phase 106 — SDK v2.0.0)**: the `expires_at` semantics
+ * changed. Pre-v2 it was the bearer JWT's 30-minute expiration; v2
+ * exposes the LINK's expiration (days/weeks). Without this fix the UI
+ * would falsely render every gift as expiring in 30 minutes regardless
+ * of the actual gift lifetime. Backend also now emits a typed pointer
+ * field `scheduled_at` (null when status !== `'scheduled'`) and
+ * `withdrawable_amount_cents` — the post-fee net the bearer can claim.
+ *
  * `claimed_at` is `null` until a settled withdrawal exists; the setter
  * of a claimed state is the settled withdrawal's updated timestamp.
  */
 export interface GetGiftResponse {
   id: string;
+  /** Gross gift amount in centavos — what the creator funded. */
   amount_cents: number;
+  /**
+   * Net amount in centavos the bearer can actually claim — gross minus
+   * the platform fee deducted at creation. The claim UI MUST render this
+   * value (the gross would mislead about what hits the bearer's PIX key).
+   */
+  withdrawable_amount_cents: number;
   status: GiftStatus;
   /** Creator-supplied greeting; empty string when omitted at create time. */
   message: string;
   /** RFC3339.ms UTC; null until the gift is claimed. */
   claimed_at: string | null;
-  /** RFC3339.ms UTC. */
+  /**
+   * RFC3339.ms UTC; emitted only when `status === 'scheduled'` (money
+   * credited but still parked in a release-day bucket); null otherwise.
+   */
+  scheduled_at: string | null;
+  /**
+   * RFC3339.ms UTC. Phase 106 — LINK expiration (source:
+   * `payment.GiftMetadata.Link.ExpiresAt`), NOT the bearer JWT's
+   * 30-minute expiry.
+   */
   expires_at: string;
 }
 
@@ -155,17 +198,75 @@ export interface RegenerateGiftParams {
 /**
  * Response from `POST /payments/gift/:id/regenerate-link`.
  *
- * The previous active tokens for the synthetic owner are revoked in the
- * same transaction that mints the new one. The frontend builds the magic
- * link from `access_token` (see `CreateGiftResponse` docstring).
+ * **BREAKING (Phase 106 — SDK v2.0.0)**: same shape change as
+ * `CreateGiftResponse`. The regenerate flow no longer mints a bearer
+ * JWT; it generates a new public 16-char base62 code, hashes it, and
+ * atomically overwrites `payment.GiftMetadata.Link`. The previous code
+ * stops resolving on the next call to `gifts.resolve()`. Bearers minted
+ * from past resolves continue to live up to 30 minutes via their natural
+ * JWT expiry (CONTEXT.md "bearer policy" decision lock — accepted
+ * window).
+ *
+ * `gift_path` is RELATIVE (e.g. `/gift/xY9wV2qZ8mN3oP1l`); frontend
+ * prefixes its own origin (preserves GIFT-SEC-01).
  */
 export interface RegenerateGiftResponse {
-  /** New JWT bearer token; scopes `[withdrawals:write, gifts:read]`. */
-  access_token: string;
-  /** RFC3339.ms UTC timestamp when the new token expires. */
+  /**
+   * Phase 106 — relative path component of the new magic link
+   * (e.g. `/gift/xY9wV2qZ8mN3oP1l`). Frontend constructs the full URL
+   * as `<own-origin> + gift_path`.
+   */
+  gift_path: string;
+  /**
+   * RFC3339.ms UTC. New LINK expiration timestamp (Phase 106) — NOT a
+   * bearer JWT expiry.
+   */
   expires_at: string;
   /** RFC3339.ms UTC timestamp when the regenerate operation committed. */
   regenerated_at: string;
+}
+
+// ── Resolve (Phase 106) ─────────────────────────────────────────────
+
+/**
+ * Parameters for `POST /gift/resolve` — Phase 106 short-link resolver.
+ *
+ * The 16-char base62 code (charset `[0-9A-Za-z]`) extracted from the
+ * magic link's URL fragment. POST + body (NOT GET + path) so the code
+ * is never leaked via browser history, Referer header, access logs, or
+ * link unfurl previewers (WhatsApp / iMessage / Slack / Telegram all
+ * GET shared URLs to render previews — a GET-with-code endpoint would
+ * be auto-resolved by those, burning the gift before the recipient
+ * clicks).
+ */
+export interface ResolveGiftParams {
+  /** 16-char base62 gift code extracted from the magic link fragment. */
+  code: string;
+}
+
+/**
+ * Response from `POST /gift/resolve`.
+ *
+ * - `access_token`: ephemeral 30-minute bearer JWT scoped to the
+ *   synthetic gift wallet (scopes `[withdrawals:write, gifts:read]`).
+ *   Use as `Authorization: Bearer <access_token>` on subsequent
+ *   `gifts.get()` and `withdrawals.create()` calls.
+ * - `expires_at`: the JWT's expiration (NOT the link's). Re-call
+ *   `gifts.resolve()` with the same code to mint a fresh JWT (within
+ *   the link's longer-term `expires_at`).
+ *
+ * The server emits `Cache-Control: no-store, private` — do NOT layer a
+ * custom cache on top of this method. Every resolve produces a fresh
+ * JWT; treat the response as a single-use credential.
+ */
+export interface ResolveGiftResponse {
+  /** Signed bearer JWT with scopes `[withdrawals:write, gifts:read]`. 30-minute TTL by default. */
+  access_token: string;
+  /**
+   * RFC3339.ms UTC. JWT expiration timestamp — NOT the link's
+   * expiration. The link can outlive multiple resolves.
+   */
+  expires_at: string;
 }
 
 // ── Revoke ──────────────────────────────────────────────────────────
