@@ -24,6 +24,7 @@ export type {
   QRModuleConfig,
   QRBadgeConfig,
   QRConfig,
+  QRResult,
   RecipientView,
   LiquidatorView,
   Payment,

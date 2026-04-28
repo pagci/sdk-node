@@ -162,6 +162,29 @@ export interface QRConfig {
   badge?: QRBadgeConfig;
 }
 
+/**
+ * Server-rendered QR returned when the request body included
+ * `qr: true` or `qr: { ... }`.
+ *
+ * Source of truth: `pkg/qrcode.Result` (Go) — `data_uri` is the only
+ * field. The encoded image (SVG by default, PNG if `qr.format === "png"`)
+ * is wrapped as `data:image/<fmt>;base64,...` and can be set directly on
+ * an `<img src>` or a CSS `background-image: url(...)`.
+ *
+ * Surfaces on:
+ *  - `POST /payments` (the existing endpoint that has supported `qr` since
+ *    pre-Phase-100; SDK type lives here for re-use).
+ *  - `POST /payments/gift` (added in quick-260428-1pv — same shape, parity).
+ *
+ * Senders that want the legacy copy-paste BR Code string instead omit
+ * `qr` entirely; both endpoints fall back to `qr_code: string` (the
+ * `Liquidator.PixQR` value).
+ */
+export interface QRResult {
+  /** Data URI containing the encoded QR image (SVG default, PNG if requested). */
+  data_uri: string;
+}
+
 // ── Internal charge (Phase 87) ──────────────────────────────────────
 
 /**

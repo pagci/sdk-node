@@ -11,6 +11,8 @@
 // does not emit (magic_link is intentionally absent — the frontend builds
 // the URL from access_token + a base URL, see GIFT-SEC-01).
 
+import type { QRConfig, QRResult } from './payment.js';
+
 /**
  * Derived status of a Gift PIX, returned by `GET /gift`.
  *
@@ -84,6 +86,25 @@ export interface CreateGiftParams {
    * `false` is NOT the same as omitting.
    */
   pass_fees_to_payer?: boolean;
+  /**
+   * Opt-in server-side QR rendering (parity with `POST /payments` —
+   * quick-260428-1pv). Two valid shapes:
+   *
+   *  - `true`            — render with branded defaults (256px SVG, badge,
+   *                        whitelabel logo if configured).
+   *  - {@link QRConfig}  — full custom config (size, format, logo,
+   *                        foreground, module, background, badge).
+   *
+   * Anything else (`false`, `null`, number, string, array) is rejected by
+   * the backend with `400 invalid_request_body`. Omit the field to keep
+   * the legacy response shape (`qr_code` as a copy-paste BR Code string).
+   *
+   * Effective only when `method === "pix"` AND the PSP returned a
+   * non-empty BR Code; for `internal_charge` gifts the field is parsed
+   * and ignored (no PSP-issued QR exists), and the response falls back
+   * to the string-shape `qr_code`.
+   */
+  qr?: true | QRConfig;
 }
 
 /**
@@ -132,8 +153,32 @@ export interface CreateGiftResponse {
    * (which is 30 minutes after each resolve call).
    */
   expires_at: string;
-  /** PIX BR Code copy-paste string. Present only when `origin === "gift_pix"`. */
-  qr_code?: string;
+  /**
+   * QR code returned by the backend.
+   *
+   * - **Default** (request omitted `qr`): copy-paste PIX BR Code string
+   *   — `Liquidator.PixQR`. Present only when `origin === "gift_pix"`.
+   * - **When `qr: true` or `qr: { ... }` was sent in the request AND
+   *   `origin === "gift_pix"`**: a {@link QRResult} object with a
+   *   `data_uri` (SVG by default; PNG when `qr.format === "png"`).
+   *   The data URI can be set directly on `<img src>` or used as a CSS
+   *   `background-image: url(...)`.
+   * - **When `origin === "gift_internal_charge"`**: the field stays a
+   *   string (likely empty) regardless of the request — there is no
+   *   PSP-issued QR to render for internal charges.
+   *
+   * The union narrows at runtime by `typeof`:
+   *
+   * ```ts
+   * if (typeof res.qr_code === 'string') {
+   *   // BR Code copy-paste — render manually or display as text.
+   * } else if (res.qr_code) {
+   *   // Rendered QR object.
+   *   img.src = res.qr_code.data_uri;
+   * }
+   * ```
+   */
+  qr_code?: string | QRResult;
 }
 
 // ── Get ─────────────────────────────────────────────────────────────
