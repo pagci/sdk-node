@@ -4,6 +4,41 @@ This changelog covers integrator-facing changes only — runtime API contract,
 SDK type signatures, error codes, webhook events. Internal refactors that
 do not affect the npm consumer are not listed.
 
+## 2.0.1 — 2026-04-28 — Pix-key lookup response slimmed (quick-260428-wv4)
+
+### What changed
+
+The `POST /pix-keys/lookup` 200 OK response shape lost two fields:
+
+- `psp_used` — string, removed.
+- `from_cache` — boolean, removed.
+
+The remaining shape is `{ valid, key, key_type, receiver? }`.
+
+### Why
+
+Parity with the rest of the financial surface — `POST /payments` and
+`POST /withdrawals` only expose routing/PSP information to admin contexts
+(via the `Liquidator` view, which is `json:"-"` in non-admin code paths).
+The lookup endpoint shipped in `2.0.0` (Phase 106 sibling release)
+accidentally surfaced the routing info to all callers. This release
+brings it in line. Reduces attack surface for cache-timing inference and
+PSP-fingerprinting against DICT key resolution.
+
+### Compat
+
+The `pix-keys/lookup` endpoint went live <24h before this release; there
+are no known external consumers reading `psp_used` or `from_cache`. SDK
+consumers reading those fields will get `undefined` post-upgrade — this
+is a BREAKING change in the strictest TypeScript sense, but practically
+a no-op.
+
+### Migration
+
+If your code reads `result.psp_used` or `result.from_cache`, remove those
+reads. Operational visibility into which PSP answered lives in the
+backend's structured logs and is exposed to admins only.
+
 ## 2.0.0 — 2026-04-27 — Phase 106 Gift PIX Short-Link Resolver
 
 ### Why this release exists

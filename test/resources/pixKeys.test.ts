@@ -69,8 +69,6 @@ describe('PixKeysResource.lookup', () => {
       key: 'hake@a.org',
       key_type: 'email',
       receiver,
-      psp_used: 'cartwave',
-      from_cache: false,
     };
     mock.fixtures.push(fixture);
 
@@ -84,8 +82,12 @@ describe('PixKeysResource.lookup', () => {
     expect(res.valid).toBe(true);
     expect(res.receiver?.name).toBe('JOAO DA SILVA');
     expect(res.receiver?.bank?.ispb).toBe('00000000');
-    expect(res.psp_used).toBe('cartwave');
-    expect(res.from_cache).toBe(false);
+    // wv4: routing info MUST NOT appear on the public response.
+    // Cast to a permissive shape so the runtime check survives even
+    // if the type drops the property (defense-in-depth — a regression
+    // that re-adds the fields would fail this assertion at runtime).
+    expect((res as Record<string, unknown>).psp_used).toBeUndefined();
+    expect((res as Record<string, unknown>).from_cache).toBeUndefined();
   });
 
   it('omits receiver when valid=false (DICT-NXKEY is NOT an error)', async () => {
@@ -94,7 +96,6 @@ describe('PixKeysResource.lookup', () => {
       valid: false,
       key: 'ghost@nowhere.com',
       key_type: 'email',
-      from_cache: true,
     };
     mock.fixtures.push(fixture);
 
@@ -102,7 +103,11 @@ describe('PixKeysResource.lookup', () => {
 
     expect(res.valid).toBe(false);
     expect(res.receiver).toBeUndefined();
-    expect(res.from_cache).toBe(true);
+    // wv4: routing info MUST NOT appear on the public response, even on
+    // valid=false. Defense-in-depth: cast-and-runtime-check so a
+    // regression re-adding the fields trips this test.
+    expect((res as Record<string, unknown>).psp_used).toBeUndefined();
+    expect((res as Record<string, unknown>).from_cache).toBeUndefined();
   });
 
   it('propagates 503 pix_lookup_all_psps_failed via ApiError', async () => {

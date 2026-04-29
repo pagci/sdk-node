@@ -3,7 +3,12 @@
 // quick-260428-o4g — POST /pix-keys/lookup. Multi-PSP DICT consultation
 // behind the `pix_keys:lookup` scope. valid=false is an authoritative
 // "this key does not exist in DICT" answer (NOT an error); receiver is
-// then absent. psp_used is empty on cache hits.
+// then absent.
+//
+// quick-260428-wv4 — Routing metadata (which PSP answered, cache hit/miss)
+// is intentionally NOT exposed on the response. Parity with payments and
+// withdrawals where routing info is admin-only. Operational visibility
+// lives in the backend's structured logs.
 
 import type { Receiver } from './withdrawal.js';
 
@@ -33,15 +38,15 @@ export interface LookupPixKeyParams {
  * 200 OK response from POST /pix-keys/lookup.
  *
  * `valid=false` is an AUTHORITATIVE DICT-NXKEY answer — not an error.
- * `receiver` is omitted in that case. `psp_used` is omitted on cache hits.
+ * `receiver` is omitted in that case.
+ *
+ * Routing metadata (which PSP answered, cache hit/miss) is intentionally
+ * NOT exposed — parity with payments/withdrawals where routing info is
+ * admin-only (quick-260428-wv4).
  */
 export interface LookupPixKeyResponse {
   valid: boolean;
   key: string;
   key_type: LookupPixKeyType;
   receiver?: Receiver;
-  /** Which PSP returned the answer; absent on cache hits. */
-  psp_used?: string;
-  /** True when the response was served from the SDK-transparent server-side cache. */
-  from_cache?: boolean;
 }
