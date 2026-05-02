@@ -104,6 +104,17 @@ export enum ErrorCode {
   PreferencePlanInactive = 'preference_plan_inactive',
   LiquidatorRefInvalid = 'liquidator_ref_invalid',
   InsufficientBalance = 'insufficient_balance',
+  // quick-260502-4g0 — owner-scoped antifraud gate. Distinct from
+  // InsufficientBalance: per-wallet HAS the money, the owner total does
+  // not (sum across wallets falls short of requested + fee). Closes a
+  // multi-wallet rebalance-then-withdraw exploit. UX guidance: surface
+  // "regularize pending obligations or contact support" (NOT the
+  // top-up CTA — wallet has funds; the owner-level total is the
+  // problem). Response carries data.owner_available (cents, after
+  // netting debt/held/pending/scheduled/active_withdrawal across every
+  // wallet under the api_owner) and data.requested (cents, requested +
+  // fee).
+  AntiFraudBlocked = 'anti_fraud_blocked',
   RefundExceedsBalance = 'refund_exceeds_balance',
   RecipientNotHeld = 'recipient_not_held',
   PSPRejected = 'psp_rejected',
