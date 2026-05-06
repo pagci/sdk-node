@@ -47,6 +47,14 @@ export interface ExternalCredit {
 
   /** Pass-through of payment.status (user-facing values). */
   status: string;
+
+  /** ID of the receiver-side wallet that received this credit. Referential
+   *  within the receiver's own api_owner namespace — safe to expose under
+   *  D-19 because the receiver already owns the wallet. Closed grants get
+   *  this from the grant (D-07); open grants get it from the
+   *  recipient.wallet_id (which is scoped to the issuer's namespace by
+   *  the resolver — no cross-owner spoof vector). */
+  wallet_id: string;
 }
 
 /** Query params for `GET /external-credits`. */

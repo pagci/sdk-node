@@ -47,6 +47,7 @@ function mkCredit(overrides: Partial<ExternalCredit> = {}): ExternalCredit {
     payer_origin: 'pix',
     confirmed_at: '2026-04-27T12:00:00Z',
     status: 'paid',
+    wallet_id: 'wlt_01jxyz_main',
     ...overrides,
   };
 }
@@ -194,5 +195,15 @@ describe('ExternalCredit type — D-19 privacy contract', () => {
     // Project invariant: integer centavos. The SDK type is `number`,
     // value here is a whole int.
     expect(Number.isInteger(credit.amount_received)).toBe(true);
+  });
+
+  it('exposes wallet_id (receiver-side wallet ID) on every row', () => {
+    // wallet_id is referential within the receiver's own api_owner namespace
+    // (CLAUDE.md feedback_wallet_id_referential.md). Safe to expose because
+    // the receiver already owns the wallet — never the payer's wallet.
+    const credit = mkCredit({ wallet_id: 'wlt_test_xyz' });
+    expect(typeof credit.wallet_id).toBe('string');
+    expect(credit.wallet_id).toBe('wlt_test_xyz');
+    expect(credit.wallet_id.length).toBeGreaterThan(0);
   });
 });
