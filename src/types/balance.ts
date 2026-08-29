@@ -30,6 +30,24 @@ export interface TotalBalance {
   debt: number;
 }
 
+/** Aggregated balance for a subset of wallets (POST /user/balance/batch response). */
+export interface BatchBalance {
+  /** Sum of available balance across the requested wallets, in centavos. */
+  available: number;
+  /** Sum of locked balance, in centavos. */
+  locked: number;
+  /** Sum of pending balance, in centavos. */
+  pending: number;
+  /** Sum of scheduled balance, in centavos. */
+  scheduled: number;
+  /** Sum of debt balance, in centavos. */
+  debt: number;
+  /** Number of distinct wallet IDs aggregated (after dedup). */
+  count: number;
+  /** Per-wallet breakdown. Present only when `wallets=true` was requested. */
+  wallets?: Balance[];
+}
+
 // ── List query params ───────────────────────────────────────────────
 
 export interface WalletListParams {
